@@ -1,0 +1,682 @@
+/* themes/solar_flare_theme.qss */
+
+/* General Window and Background */
+QMainWindow {
+    background-color: #12121A; /* Very Dark Purple-Black */
+    color: #F0E6D2; /* Creamy Off-White */
+}
+
+/* Style for the central widget to ensure full background coverage */
+QWidget#centralWidget { 
+    background-color: #12121A; /* Match QMainWindow background */
+}
+
+/* Labels - General Text */
+QLabel {
+    color: #F0E6D2; /* Creamy Off-White */
+}
+
+/* GroupBoxes - General container for sensor displays and plots */
+QGroupBox {
+    background-color: #12121A; /* Very Dark Purple-Black */
+    border: 1px solid #6A0DAD; /* Dark Violet */
+    border-radius: 8px;
+    margin-top: 2ex; /* Space for the title */
+    font-size: 9pt;
+    font-weight: bold;
+    color: #FFA500; /* Orange for title */
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    padding: 0 3px;
+    background-color: #12121A; 
+}
+
+/* TabWidget and Tabs */
+QTabWidget::pane {
+    background: #201A2C; /* Dark Plum */
+    border: 1px solid #3F2C4A; /* Slightly darker plum */
+    border-radius: 8px;
+    margin-top: -1px; /* Overlap with tab bar */
+}
+
+/* Explicit style for the SettingsTab widget itself */
+QWidget#SettingsTab {
+    background-color: #201A2C; /* Match QTabWidget::pane background */
+}
+
+/* Explicit style for the scrollable content widget within SettingsTab */
+QWidget#settingsScrollContent {
+    background-color: #12121A; /* Match main window background for consistency */
+}
+
+QTabBar::tab {
+    background: #12121A; /* Very Dark Purple-Black */
+    border: 1px solid #6A0DAD; /* Dark Violet */
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+    padding: 8px 10px;
+    color: #F0E6D2; /* Creamy Off-White */
+    font-size: 8pt;
+    font-weight: bold;
+    margin-right: 2px;
+}
+
+QTabBar::tab:selected {
+    background: #201A2C; /* Dark Plum for selected tab */
+    border-bottom-color: #201A2C; /* Hide the border on the selected tab side */
+    color: #FFA500; /* Orange for selected tab text */
+    margin-top: 0px; /* Bring selected tab fully up */
+}
+
+QTabBar::tab:hover {
+    background-color: #3F2C4A; /* Slightly darker plum on hover */
+}
+
+/* --- Specific Styles for common widgets --- */
+
+/* QPushButton - General */
+QPushButton {
+    background-color: #FF8C00; /* Dark Orange */
+    color: #ffffff;
+    border: none;
+    border-radius: 5px;
+    padding: 10px 20px;
+    font-size: 10pt;
+    font-weight: bold;
+}
+
+QPushButton:hover {
+    background-color: #FFA500; /* Orange on hover */
+}
+
+QPushButton:pressed {
+    background-color: #CC6F00; /* Darker Dark Orange on press */
+}
+
+/* QLineEdit - General text input fields */
+QLineEdit {
+    border: 1px solid #6A0DAD; /* Dark Violet border */
+    border-radius: 4px;
+    padding: 5px;
+    background-color: #302640; /* Slightly lighter dark purple for input fields */
+    color: #F0E6D2; /* Creamy Off-White text */
+    font-size: 10pt;
+}
+
+QLineEdit:focus {
+    border: 1px solid #FFD700; /* Gold border when focused */
+}
+
+/* QComboBox - Dropdown menus */
+QComboBox {
+    border: 1px solid #6A0DAD;
+    border-radius: 4px;
+    padding: 5px;
+    background-color: #302640; /* Explicitly set background color */
+    color: #F0E6D2; /* Explicitly set text color */
+    font-size: 10pt;
+}
+
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 20px;
+    border-left: 1px solid #6A0DAD;
+    border-top-right-radius: 3px;
+    border-bottom-right-radius: 3px;
+}
+
+QComboBox::down-arrow {
+    image: url(data:image/png;base64,iVBORw0KGgoAAAAxAAAAAQCAMAAAAoLQ9TAAAAM1BMVEUAAADExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMR+03E4AAAAEHRSTlMAAQIDBAUGBwgJCgsMDQ4PEBESF+o+rAAAAEklEQVQY02NgIAXEBhgIBEIAABWSAQZGBkZGBgZkBgYGIgcABG4AKgAQFMAAgAQEGBgYkBiYmIgIBAAAQAEGgIEBgYGQAYDAFhGA1C6r3/AAAAAElFTSuQmCC); /* Placeholder for down arrow */
+    width: 12px;
+    height: 12px;
+}
+
+QComboBox QAbstractItemView {
+    border: 1px solid #6A0DAD;
+    selection-background-color: #FF8C00;
+    background-color: #302640; /* Explicitly set background for dropdown list */
+    color: #F0E6D2; /* Explicitly set text color for dropdown list */
+}
+
+/* QCheckBox */
+QCheckBox {
+    color: #F0E6D2;
+    font-size: 10pt;
+}
+
+QCheckBox::indicator {
+    width: 14px;
+    height: 14px;
+    border: 1px solid #6A0DAD;
+    border-radius: 3px;
+    background-color: #302640;
+}
+
+QCheckBox::indicator:checked {
+    background-color: #FF8C00; /* Dark Orange */
+    image: url(data:image/png;base64,iVBORw0KGgoAAAAcAAAAHCAMAAADU90dbAAAAAXRSTlMAQObYZgAAABtJRU5ErkJggg==); /* Small checkmark */
+}
+
+/* QProgressBar */
+QProgressBar {
+    background-color: transparent;
+    border: 1px solid #6A0DAD;
+    border-radius: 5px;
+    text-align: center;
+    color: #F0E6D2; /* Creamy Off-White text */
+    font-size: 10pt;
+}
+
+QProgressBar::chunk {
+    background-color: transparent; /* KEPT THIS TRANSPARENT for custom drawing */
+    border-radius: 5px;
+}
+
+QProgressBar[orientation_type="vertical"]::chunk {
+    background-color: transparent;
+}
+
+/* Alerts and Status Colors */
+QProgressBar.alert::chunk {
+    background-color: transparent;
+}
+
+/* ScrollArea */
+QScrollArea {
+    border: none;
+}
+
+QScrollArea > QWidget { /* This targets the QWidget that is the direct child of QScrollArea (scroll_content_widget) */
+    background-color: #12121A; /* Match main window background for consistency */
+}
+
+QScrollBar:vertical {
+    border: 1px solid #3F2C4A;
+    background: #12121A;
+    width: 10px;
+    margin: 15px 0 15px 0;
+    border-radius: 5px;
+}
+
+QScrollBar::handle:vertical {
+    background: #6A0DAD;
+    border-radius: 4px;
+    min-height: 20px;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    border: none;
+    background: none;
+}
+
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+    background: none;
+}
+
+QScrollBar:horizontal {
+    border: 1px solid #3F2C4A;
+    background: #12121A;
+    height: 10px;
+    margin: 0 15px 0 15px;
+    border-radius: 5px;
+}
+
+QScrollBar::handle:horizontal {
+    background: #6A0DAD;
+    border-radius: 4px;
+    min-width: 20px;
+}
+
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    border: none;
+    background: none;
+}
+
+QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
+    background: none;
+}
+
+/* Alerts and Status Colors */
+QLabel.alert {
+    color: #FF0000; /* Bright Red for alert text */
+    font-weight: bold;
+}
+
+QGroupBox.alert {
+    border: 2px solid #FF0000; /* Bright Red border for alert groupbox */
+}
+
+/* Status Bar Messages */
+QStatusBar QLabel#info_status_label {
+    color: #28a745; /* Green */
+}
+
+QStatusBar QLabel#warning_status_label {
+    color: #FFFF00; /* Bright Yellow */
+}
+
+QStatusBar QLabel#error_status_label {
+    color: #FF0000; /* Bright Red */
+}
+
+QStatusBar QLabel#default_status_label {
+    color: #6c757d; /* Grey */
+}
+
+/* --- Styles for different gauge types (defined in SensorDisplayWidget) --- */
+
+/* Type 1 (Standard) */
+QGroupBox[type_class="type_1_standard"] {
+    /* Base styles, inherited or set by general QGroupBox */
+}
+QLabel[type_class="type_1_standard"] {
+    font-size: 16pt;
+}
+
+/* Type 2 (Compact) */
+QGroupBox[type_class="type_2_compact"] {
+    /* Base styles, inherited or set by general QGroupBox */
+}
+QLabel[type_class="type_2_compact"] {
+    font-size: 14pt;
+}
+
+/* Type 3 (Digital) */
+QGroupBox[type_class="type_3_digital"] {
+    background-color: #000000; /* Black background for digital */
+    border: 1px solid #FFD700; /* Gold */
+    color: #FFD700; /* Gold text */
+    border-radius: 5px;
+}
+QGroupBox[type_class="type_3_digital"]::title {
+    color: #FFD700;
+}
+QLabel[type_class="type_3_digital"] {
+    font-family: "Digital-7"; /* Custom font */
+    font-size: 24pt;
+    font-weight: bold;
+    color: #FFD700; /* Gold digital display */
+}
+
+/* Type 4 (Analog - Basic) & Type 5 (Analog - Full) */
+QGroupBox[type_class="type_4_analog_basic"],
+QGroupBox[type_class="type_5_analog_full"] {
+    background-color: transparent; /* Ensure transparent for custom drawing */
+    border: none; /* No QSS border; custom drawn */
+}
+QLabel[type_class="type_4_analog_basic"],
+QLabel[type_class="type_5_analog_full"] {
+    background-color: transparent;
+}
+
+/* Type 6 (Progress Bar - Horizontal) */
+QProgressBar[type_class="type_6_progress_bar_horizontal"] {
+    /* Base QProgressBar styles applied */
+}
+
+/* Type 7 (Progress Bar - Vertical) */
+QProgressBar[type_class="type_7_progress_bar_vertical"] {
+    /* Base QProgressBar styles applied */
+}
+
+/* --- Styles for different gauge styles (defined in SensorDisplayWidget) --- */
+
+/* Style 1 (Flat) */
+QGroupBox[style_class="style_1_flat"] {
+    background-color: #12121A;
+    border: 1px solid #6A0DAD;
+    border-radius: 8px;
+}
+QGroupBox[style_class="style_1_flat"]::title {
+    color: #FFA500;
+}
+QLabel[style_class="style_1_flat"] {
+    color: #F0E6D2;
+}
+QProgressBar[style_class="style_1_flat"] {
+    background-color: #302640; /* Distinct trough for flat style */
+    border: 1px solid #6A0DAD;
+    color: #F0E6D2;
+}
+QProgressBar[style_class="style_1_flat"]::chunk {
+    background-color: transparent;
+}
+
+/* Style 2 (Shadowed) */
+QGroupBox[style_class="style_2_shadowed"] {
+    background-color: #201A2C; /* Dark Plum for depth */
+    border: 2px solid #3F2C4A;
+    border-radius: 8px;
+}
+QGroupBox[style_class="style_2_shadowed"]::title {
+    color: #F0E6D2;
+}
+QLabel[style_class="style_2_shadowed"] {
+    color: #F0E6D2;
+}
+QProgressBar[style_class="style_2_shadowed"] {
+    background-color: #0A0812; /* Darker trough for shadowed effect */
+    border: 1px solid #3F2C4A;
+    color: #F0E6D2;
+}
+QProgressBar[style_class="style_2_shadowed"]::chunk {
+    background-color: transparent;
+}
+
+/* Style 3 (Raised) */
+QGroupBox[style_class="style_3_raised"] {
+    background-color: #12121A;
+    border: 2px outset #A08AD2; /* Light Violet */
+    border-radius: 8px;
+}
+QGroupBox[style_class="style_3_raised"]::title {
+    color: #FFA500;
+}
+QLabel[style_class="style_3_raised"] {
+    color: #F0E6D2;
+}
+QProgressBar[style_class="style_3_raised"] {
+    background-color: #403050; /* Medium purple trough for raised effect */
+    border: 2px outset #A08AD2;
+    color: #F0E6D2;
+}
+QProgressBar[style_class="style_3_raised"]::chunk {
+    background-color: transparent;
+}
+
+/* Style 4 (Inset) */
+QGroupBox[style_class="style_4_inset"] {
+    background-color: #12121A;
+    border: 2px inset #A08AD2;
+    border-radius: 8px;
+}
+QGroupBox[style_class="style_4_inset"]::title {
+    color: #FFA500;
+}
+QLabel[style_class="style_4_inset"] {
+    color: #F0E6D2;
+}
+QProgressBar[style_class="style_4_inset"] {
+    background-color: #0A0812; /* Darker trough for inset effect */
+    border: 2px inset #A08AD2;
+    color: #F0E6D2;
+}
+QProgressBar[style_class="style_4_inset"]::chunk {
+    background-color: transparent;
+}
+
+/* Style 5 (Heavy Border) */
+QGroupBox[style_class="style_5_heavy_border"] {
+    background-color: #12121A;
+    border: 3px solid #FFA500;
+    border-radius: 8px;
+}
+QGroupBox[style_class="style_5_heavy_border"]::title {
+    color: #FFA500;
+}
+QLabel[style_class="style_5_heavy_border"] {
+    color: #F0E6D2;
+}
+QProgressBar[style_class="style_5_heavy_border"] {
+    background-color: #281D33; /* Darker trough with heavy border */
+    border: 3px solid #FFA500;
+    color: #F0E6D2;
+}
+QProgressBar[style_class="style_5_heavy_border"]::chunk {
+    background-color: transparent;
+}
+
+/* Style 6 (Clean) */
+QGroupBox[style_class="style_6_clean"] {
+    background-color: #12121A;
+    border: 1px solid #3F2C4A;
+    border-radius: 5px; /* Slightly less rounded */
+}
+QGroupBox[style_class="style_6_clean"]::title {
+    color: #F0E6D2;
+}
+QLabel[style_class="style_6_clean"] {
+    color: #F0E6D2;
+}
+QProgressBar[style_class="style_6_clean"] {
+    background-color: #181420; /* Subtle trough for clean style */
+    border: 1px solid #3F2C4A;
+    color: #F0E6D2;
+}
+QProgressBar[style_class="style_6_clean"]::chunk {
+    background-color: transparent;
+}
+
+/* Style 7 (Deep Shadow) */
+QGroupBox[style_class="style_7_deep_shadow"] {
+    background-color: #201A2C; /* Dark Plum */
+    border: 1px solid #3F2C4A;
+    border-radius: 8px;
+}
+QGroupBox[style_class="style_7_deep_shadow"]::title {
+    color: #FFA500;
+}
+QLabel[style_class="style_7_deep_shadow"] {
+    color: #F0E6D2;
+}
+QProgressBar[style_class="style_7_deep_shadow"] {
+    background-color: #050408; /* Very dark trough for deep shadow */
+    border: 1px solid #3F2C4A;
+    color: #F0E6D2;
+}
+QProgressBar[style_class="style_7_deep_shadow"]::chunk {
+    background-color: transparent;
+}
+
+/* Style 8 (Outline) */
+QGroupBox[style_class="style_8_outline"] {
+    background-color: transparent;
+    border: 2px dashed #FFD700;
+    border-radius: 8px;
+}
+QGroupBox[style_class="style_8_outline"]::title {
+    color: #FFD700;
+}
+QLabel[style_class="style_8_outline"] {
+    color: #F0E6D2;
+}
+QProgressBar[style_class="style_8_outline"] {
+    background-color: #12121A; /* Solid background for trough */
+    border: 2px dashed #FFD700;
+    color: #F0E6D2;
+}
+QProgressBar[style_class="style_8_outline"]::chunk {
+    background-color: transparent;
+}
+
+/* Style 9 (Vintage) - REVAMPED FOR ALL GAUGE TYPES */
+QGroupBox[style_class="style_9_vintage"] {
+    background-color: #4F4030; /* Muted brown */
+    border: 2px solid #8B7A60;
+    border-radius: 8px;
+    font-size: 14pt;
+    font-weight: bold;
+    color: #F0E6D2;
+}
+QGroupBox[style_class="style_9_vintage"]::title {
+    color: #F0E6D2;
+}
+QLabel[style_class="style_9_vintage"] {
+    color: #F0E6D2;
+}
+QProgressBar[style_class="style_9_vintage"] {
+    background-color: #352B20; /* Darker muted brown */
+    border: 1px solid #665A40;
+    border-radius: 5px;
+    text-align: center;
+    color: #F0E6D2;
+    font-size: 10pt;
+}
+QProgressBar[style_class="style_9_vintage"]::chunk {
+    background-color: transparent;
+    border-radius: 5px;
+}
+QGroupBox[type_class="type_3_digital"][style_class="style_9_vintage"] {
+    background-color: #352B20;
+    border: 1px solid #665A40;
+    color: #F0E6D2;
+}
+QGroupBox[type_class="type_3_digital"][style_class="style_9_vintage"]::title {
+    color: #F0E6D2;
+}
+QLabel[type_class="type_3_digital"][style_class="style_9_vintage"] {
+    color: #9B9B9B;
+    font-family: "Digital-7";
+}
+
+/* Style 10 (Subtle) */
+QGroupBox[style_class="style_10_subtle"] {
+    background-color: #12121A;
+    border: 1px solid #3B2F4A;
+    border-radius: 6px;
+}
+QGroupBox[style_class="style_10_subtle"]::title {
+    color: #D2BFD6; /* Softer lavender */
+}
+QLabel[style_class="style_10_subtle"] {
+    color: #D2BFD6;
+}
+QProgressBar[style_class="style_10_subtle"] {
+    background-color: #281D33; /* Subtle trough */
+    border: 1px solid #3B2F4A;
+    color: #D2BFD6;
+}
+QProgressBar[style_class="style_10_subtle"]::chunk {
+    background-color: transparent;
+}
+
+/* Style 11 (Fresh) */
+QGroupBox[style_class="style_11_fresh"] {
+    background-color: #FFF2E0; /* Light Peach */
+    border: 1px solid #FFC0CB;
+    border-radius: 8px;
+}
+QGroupBox[style_class="style_11_fresh"]::title {
+    color: #FF69B4; /* Hot Pink */
+}
+QLabel[style_class="style_11_fresh"] {
+    color: #FF69B4;
+}
+QProgressBar[style_class="style_11_fresh"] {
+    background-color: #FFE5E5; /* Lighter pink trough */
+    border: 1px solid #FFC0CB;
+    color: #FF69B4;
+}
+QProgressBar[style_class="style_11_fresh"]::chunk {
+    background-color: transparent;
+}
+
+/* Style 12 (Bright) */
+QGroupBox[style_class="style_12_bright"] {
+    background-color: #F0FFFF; /* Azure */
+    border: 1px solid #48D1CC; /* Medium Turquoise */
+    border-radius: 8px;
+}
+QGroupBox[style_class="style_12_bright"]::title {
+    color: #008B8B; /* Dark Cyan */
+}
+QLabel[style_class="style_12_bright"] {
+    color: #8A2BE2; /* Blue Violet */
+}
+QProgressBar[style_class="style_12_bright"] {
+    background-color: #E0FFFF; /* Light Cyan trough */
+    border: 1px solid #48D1CC;
+    color: #8A2BE2;
+}
+QProgressBar[style_class="style12bright"]::chunk {
+    background-color: transparent;
+}
+
+/* Style 13 (Bold) */
+QGroupBox[style_class="style_13_bold"] {
+    background-color: #2F4F4F; /* Dark Slate Gray */
+    border: 2px solid #5F9EA0; /* Cadet Blue */
+    border-radius: 10px;
+}
+QGroupBox[style_class="style_13_bold"]::title {
+    color: #FFFFFF;
+}
+QLabel[style_class="style_13_bold"] {
+    color: #FFFFFF;
+}
+QProgressBar[style_class="style_13_bold"] {
+    background-color: #4682B4; /* Steel Blue trough */
+    border: 2px solid #5F9EA0;
+    color: #FFFFFF;
+}
+QProgressBar[style_class="style_13_bold"]::chunk {
+    background-color: transparent;
+}
+
+/* Matplotlib specific colors (referenced by QSSParser for Python plotting) */
+/*matplotlib*/
+facecolor: #12121A;
+edgecolor: #6A0DAD;
+tick_color: #302640;
+label_color: #302640;
+title_color: #FF8C00;
+grid_color: #D2BFD6;
+legend_facecolor: #E0C8E8;
+legend_edgecolor: #C0A8D0;
+legend_labelcolor: #302640;
+line_colors: #FFA500, #FFD700, #FF0000, #A020F0, #20B2AA, #DA70D6, #FF69B4, #5DA2D9;
+
+/*custom_drawing_colors*/
+font_family: Inter;
+digital_font_family: Digital-7;
+gauge_text_outline_color: black;
+gauge_high_contrast_text_color: #FFFFFF;
+
+analog_gauge_background: #FFFFFF;
+analog_gauge_border: #C0A8D0;
+analog_gauge_scale_color: #302640;
+analog_gauge_label_color: #302640;
+analog_gauge_needle_color: #FF0000;
+analog_gauge_center_dot_color: #FF8C00;
+analog_gauge_text_color: #302640;
+
+/* --- NEW/MODIFIED COLORS FOR PROGRESS BARS AND ALERTS --- */
+
+/* General Gauge Colors (Default, when not in alert) */
+gauge_background_normal: #12121A;
+gauge_border_normal: #6A0DAD;
+gauge_fill_normal: #FFA500; /* Orange (for bars and standard gauge fill) */
+gauge_text_normal: #F0E6D2;
+
+/* Alert Specific Gauge Colors */
+gauge_background_alert: #5C2D2D;
+gauge_border_alert: #FF6666;
+gauge_fill_alert: #FF0000;
+gauge_text_alert: #FFFF00;
+
+gauge_warning_color: #FFFF00; /* Bright Yellow for warning state */
+gauge_critical_color: #FF0000; /* Bright Red for critical alert lines/fills */
+
+/* Progress Bar Specific Colors (These will override general gauge colors for PB types) */
+progressbar_background: #12121A;
+progressbar_border: 1px solid #6A0DAD;
+progressbar_border_radius: 4px;
+progressbar_chunk_color: #FFA500;
+progressbar_text_color: #F0E6D2;
+
+/* Progress Bar Alert Specific Colors */
+progressbar_background_alert: #5C2D2D;
+progressbar_border_alert: 1px solid #FF6666;
+progressbar_chunk_alert_color: #FF0000;
+progressbar_text_alert_color: #FFFF00;
+
+/* Digital Gauge Specific Colors */
+digital_gauge_font_color: #FFD700; /* Gold */
+digital_gauge_bg_color: #000000;
+digital_gauge_border_color: #FFD700;
+digital_gauge_font_alert_color: #FF0000;
+digital_gauge_bg_alert_color: #300000;
+digital_gauge_border_alert_color: #FF0000;
