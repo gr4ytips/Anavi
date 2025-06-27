@@ -49,7 +49,6 @@ config.ini
 Sensor_Logs/
 Debug_Logs/
 Archive_Sensor_Logs/
-fonts/
 split.sh
 backup
 *.txt
