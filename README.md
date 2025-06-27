@@ -1,13 +1,13 @@
-# ?? Anavi Sensor Monitoring Application
+# ğŸ  Anavi Sensor Monitoring Application
 
-## ?? Project Description
+## ğŸ“Š Project Description
 
 This is a robust and visually enhanced desktop application designed for monitoring various environmental sensors connected to a Raspberry Pi. It provides real-time data visualization through customizable gauges and plots, allowing users to track sensor trends, identify anomalies, and manage alert thresholds.  
 The application is built using **PyQt5** for the graphical user interface and **Matplotlib** for data plotting, featuring a modular architecture that supports easy expansion with new sensors and themes.
 
 ---
 
-## ?? Features
+## ğŸ”§ Features
 
 - **Real-time Sensor Monitoring**  
   Displays live data from connected HTU21D (Temperature, Humidity), BMP180 (Temperature, Pressure), and BH1750 (Light) sensors.
@@ -32,7 +32,7 @@ The application is built using **PyQt5** for the graphical user interface and **
 
 ---
 
-## ?? User Interface (UI Preview)
+## ğŸŒ User Interface (UI Preview)
 
 > _**Placeholder for screenshots or UI images.**_  
 > Add annotated screenshots below to visually represent:
@@ -50,9 +50,9 @@ The application is built using **PyQt5** for the graphical user interface and **
 
 ---
 
-## ??? Prerequisites
+## ğŸ› ï¸ Prerequisites
 
-### ?? Hardware Requirements
+### ğŸ’» Hardware Requirements
 
 - **Raspberry Pi 4 Model B** (recommended)
 - **Raspberry Pi OS Bullseye** (64-bit Lite or Desktop)
@@ -62,7 +62,7 @@ The application is built using **PyQt5** for the graphical user interface and **
 - **ANAVI Infrared pHAT** with onboard **BH1750 Light Sensor**
 - Optional external sensors via I2C: **HTU21D**, **BMP180**
 
-### ?? Software Requirements
+### ğŸ“’ Software Requirements
 
 - Python 3 (check with `python3 --version`)
 - Pip (install: `sudo apt install python3-pip`)
@@ -81,7 +81,7 @@ sudo reboot
 
 ---
 
-## ?? Installation Guide
+## ğŸ“¦ Installation Guide
 
 ```bash
 # Clone the repository
@@ -109,42 +109,42 @@ i2cdetect -y 1
 
 ---
 
-## ?? Directory Structure
+## ğŸ“‚ Directory Structure
 
 ```
 your_project_root/
 +-- main.py
 +-- ui.py
 +-- data_management/
-¦   +-- __init__.py
-¦   +-- data_store.py
-¦   +-- settings.py
-¦   +-- logger.py
-¦   +-- qss_parser.py
+Â¦   +-- __init__.py
+Â¦   +-- data_store.py
+Â¦   +-- settings.py
+Â¦   +-- logger.py
+Â¦   +-- qss_parser.py
 +-- sensors/
-¦   +-- __init__.py
-¦   +-- mock_sensors.py
-¦   +-- sensor_reader.py
-¦   +-- (htu21d_sensor.py, bmp180_sensor.py, bh1750_sensor.py)
+Â¦   +-- __init__.py
+Â¦   +-- mock_sensors.py
+Â¦   +-- sensor_reader.py
+Â¦   +-- (htu21d_sensor.py, bmp180_sensor.py, bh1750_sensor.py)
 +-- widgets/
-¦   +-- __init__.py
-¦   +-- dashboard_tab.py
-¦   +-- sensor_details_tab.py
-¦   +-- settings_tab.py
-¦   +-- about_tab.py
-¦   +-- sensor_display.py
-¦   +-- matplotlib_widget.py
+Â¦   +-- __init__.py
+Â¦   +-- dashboard_tab.py
+Â¦   +-- sensor_details_tab.py
+Â¦   +-- settings_tab.py
+Â¦   +-- about_tab.py
+Â¦   +-- sensor_display.py
+Â¦   +-- matplotlib_widget.py
 +-- themes/
-¦   +-- blue_theme.qss
-¦   +-- emerald_forest_theme.qss
+Â¦   +-- blue_theme.qss
+Â¦   +-- emerald_forest_theme.qss
 +-- resources/
-¦   +-- fonts/
-¦   ¦   +-- digital-7.ttf
-¦   +-- sounds/
-¦   ¦   +-- alert.wav
-¦   +-- images/
-¦       +-- icon.png
-¦       +-- logo.png
+Â¦   +-- fonts/
+Â¦   Â¦   +-- digital-7.ttf
+Â¦   +-- sounds/
+Â¦   Â¦   +-- alert.wav
+Â¦   +-- images/
+Â¦       +-- icon.png
+Â¦       +-- logo.png
 +-- config.ini
 +-- Sensor_Logs/
 +-- Archive_Sensor_Logs/
@@ -153,7 +153,7 @@ your_project_root/
 
 ---
 
-## ?? Usage
+## ğŸ” Usage
 
 ```bash
 python3 main.py
@@ -163,35 +163,35 @@ The application will launch, displaying tabs for dashboard, sensor details, sett
 
 ---
 
-## ?? Credits
+## ğŸ‘¤ Credits
 
 - **Initial Code Generation**: Gemini (Google)
 - **Enhancements**: UI and feature development guided by **gr4ytips**
 
 ---
 
-## ?? License
+## ğŸ’¼ License
 
 This work is licensed under the **Creative Commons Attribution 4.0 International (CC BY 4.0)** license.
 
 [![License: CC BY 4.0](https://img.shields.io/badge/License-CC%20BY%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/)
 
 You are free to:
-- **Share** — copy and redistribute the material in any medium or format
-- **Adapt** — remix, transform, and build upon the material for any purpose, even commercially.
+- **Share** â€” copy and redistribute the material in any medium or format
+- **Adapt** â€” remix, transform, and build upon the material for any purpose, even commercially.
 
 Under the following terms:
-- **Attribution** — You must give appropriate credit, provide a link to the license, and indicate if changes were made.
+- **Attribution** â€” You must give appropriate credit, provide a link to the license, and indicate if changes were made.
 
 ---
 
-## ?? Liability
+## âš ï¸ Liability
 
-This software is provided **"as is"**, without any warranty—express or implied. Use at your own risk. The authors and contributors shall not be held liable for any damages or losses arising from its use.
+This software is provided **"as is"**, without any warrantyâ€”express or implied. Use at your own risk. The authors and contributors shall not be held liable for any damages or losses arising from its use.
 
 ---
 
-## ?? Warning
+## âš ï¸ Warning
 
 - Double-check **GPIO/I2C wiring** to avoid hardware damage.
 - Use a **stable power supply**.
@@ -201,7 +201,7 @@ This software is provided **"as is"**, without any warranty—express or implied. 
 
 ---
 
-## ?? Disclaimer
+## ğŸ” Disclaimer
 
 This application is for **monitoring only**.  
 Not for use in **critical or life-sustaining systems**.
