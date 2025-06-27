@@ -85,8 +85,8 @@ sudo reboot
 
 ```bash
 # Clone the repository
-git clone [your_repository_url]
-cd your_project_root
+git clone https://github.com/gr4ytips/Anavi.git
+cd InfraredpHAT
 
 # Install dependencies
 pip3 install -r requirements.txt
