@@ -85,14 +85,14 @@ class AboutTab(QWidget):
         main_layout.addItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Fixed))
 
         # Developer Info
-        developer_label = QLabel("Developed by: Anavi Technology Community")
+        developer_label = QLabel("Developed by: gr4ytips")
         developer_label.setObjectName("AboutDeveloperLabel")
         developer_label.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(developer_label)
 
         # GitHub Link (as a QLabel with openExternalLinks)
         github_link = QLabel(
-            "<a href='https://github.com/AnaviTechnology'>GitHub Repository</a>"
+            "<a href='https://github.com/gr4ytips/Anavi'>GitHub Repository</a>"
         )
         github_link.setObjectName("AboutLink")
         github_link.setAlignment(Qt.AlignCenter)
