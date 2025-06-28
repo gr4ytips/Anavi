@@ -34,19 +34,17 @@ The application is built using **PyQt5** for the graphical user interface and **
 
 ## 🌐 User Interface (UI Preview)
 
-> _**Placeholder for screenshots or UI images.**_  
-> Add annotated screenshots below to visually represent:
->
-> - The main dashboard with gauges  
-> - Sensor detail plots  
-> - Theming variations  
-> - Settings and configuration tabs  
+### 🧩 Multi-Sensor Dashboard
+![Dashboard](https://github.com/gr4ytips/Anavi/blob/main/InfraredpHAT/screens/dashboard_tab.png)
 
-**Example:**
-```markdown
-![Dashboard View](resources/images/dashboard_sample.png)
-![Sensor Details](resources/images/sensor_plot_sample.png)
-```
+### 🌡️ Sensor Deatailed View
+![Sensors](https://github.com/gr4ytips/Anavi/blob/main/InfraredpHAT/screens/sensor_details_tab.png)
+
+### 👁️ Sensor detail plots  
+![Plots](https://github.com/gr4ytips/Anavi/blob/main/InfraredpHAT/screens/plot_tab.png)
+
+### 💨 Settings and configuration tabs  
+![Settings](https://github.com/gr4ytips/Anavi/blob/main/InfraredpHAT/screens/settings_tab.png)
 
 ---
 
