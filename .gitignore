@@ -45,7 +45,7 @@ eggs/
 .DS_Store
 Thumbs.db
 
-config.ini
+
 Sensor_Logs/
 Debug_Logs/
 Archive_Sensor_Logs/
@@ -53,4 +53,4 @@ split.sh
 backup/
 *.txt
 *.bak
-.ini
+logs
