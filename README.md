@@ -43,8 +43,11 @@ The application is built using **PyQt5** for the graphical user interface and **
 ### 👁️ Sensor detail plots  
 ![Plots](https://github.com/gr4ytips/Anavi/blob/main/InfraredpHAT/screens/plot_tab.png)
 
-### 💨 Settings and configuration tabs  
+### 💨 Settings and configuration
 ![Settings](https://github.com/gr4ytips/Anavi/blob/main/InfraredpHAT/screens/settings_tab.png)
+
+### 💨 UI Customization
+![Settings](https://github.com/gr4ytips/Anavi/blob/main/InfraredpHAT/screens/ui_customization_tab.png)
 
 ---
 
