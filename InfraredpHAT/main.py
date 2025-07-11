@@ -1,584 +1,474 @@
+# main.py
+# -*- coding: utf-8 -*-
 import sys
 import os
-import datetime
 import logging
-import logging.handlers # For RotatingFileHandler
-import time # Added for time.time() in log_sensor_data_to_file
-import collections # Added for collections.deque in _on_settings_updated
-from functools import partial # For partial functions with signals
+import configparser
+from datetime import datetime, timedelta
+import collections 
 
-# --- IMPORTANT: Set Matplotlib backend BEFORE importing pyplot ---
-import matplotlib
-matplotlib.use('Qt5Agg') # Ensure Matplotlib uses the Qt5 backend for PyQt5 integration
-# ---------------------------------------------------------------
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QStackedWidget, QMessageBox, QTabWidget, QSpacerItem, QSizePolicy, QStatusBar
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal, pyqtSlot, QUrl, QThread, QObject, QLocale
+from PyQt5.QtGui import QIcon, QFont, QFontDatabase, QPalette, QColor, QBrush, QTransform, QIntValidator, QDoubleValidator 
 
-from PyQt5.QtWidgets import QApplication, QMainWindow, QTabWidget, QVBoxLayout, QWidget, QStatusBar, QLabel, QAction, QMenu, QSystemTrayIcon, QMessageBox, QActionGroup, QStyle, QInputDialog
-from PyQt5.QtCore import QTimer, Qt, QCoreApplication, QRect, QPoint, QPointF, pyqtSignal, pyqtSlot, QLocale # Import QLocale
-from PyQt5.QtGui import QIcon, QPixmap, QImage, QPainter, QFont, QColor, QFontDatabase, QDoubleValidator, QValidator
-
-# Using QMediaPlayer and QMediaContent for sound playback for better compatibility
-from PyQt5.QtMultimedia import QSound # Original QSound for simpler cases, re-enabled
-
-# Data management and settings
-from data_management.data_store import SensorDataStore 
+# Import custom modules
+from data_management.data_store import SensorDataStore
 from data_management.settings import SettingsManager
-from data_management.qss_parser import QSSParser # Import QSSParser
-from data_management.logger import SensorLogger # Import SensorLogger for dedicated sensor data logging
-
-# UI Components
+from data_management.logger import SensorLogger 
 from ui import AnaviSensorUI
-
-# Sensor reading thread
 from sensors.sensor_reader import SensorReaderThread
 
-# --- GLOBAL LOGGING CONFIGURATION ---
-# Get the root logger
-root_logger = logging.getLogger()
-root_logger.setLevel(logging.DEBUG) # Set the root logger level to DEBUG
+# Get the logger for this module. Configuration will be applied later by setup_logging.
+logger = logging.getLogger(__name__)
 
-# Clear any existing handlers to prevent duplicate output if basicConfig was called implicitly
-if root_logger.handlers:
-    for handler in root_logger.handlers:
+def setup_logging(settings_manager):
+    """
+    Configures the root logger based on settings from SettingsManager.
+    This function is called once at startup.
+    """
+    root_logger = logging.getLogger()
+    # Clear any existing handlers to prevent duplicate logs from being created
+    # if this function is ever called more than once.
+    for handler in root_logger.handlers[:]:
         root_logger.removeHandler(handler)
 
-# Create a console handler (StreamHandler)
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.INFO) # Set console output to INFO and above
-console_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-console_handler.setFormatter(console_formatter)
-root_logger.addHandler(console_handler) # Add to root logger
+    # Configure Console Logging
+    if settings_manager.get_boolean_setting('Logging', 'enable_console_logging', True):
+        console_level_str = settings_manager.get_setting('Logging', 'log_level_console', fallback='INFO').upper()
+        console_level = getattr(logging, console_level_str, logging.INFO)
+        
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(console_level)
+        console_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+        console_handler.setFormatter(console_formatter)
+        root_logger.addHandler(console_handler)
 
-# Create a rotating file handler for debug logs
-debug_log_dir = "Debug_Logs"
-os.makedirs(debug_log_dir, exist_ok=True)
-debug_log_file = os.path.join(debug_log_dir, "debug.log.txt")
-file_handler = logging.handlers.RotatingFileHandler(
-    debug_log_file,
-    maxBytes=5 * 1024 * 1024, # 5 MB per file
-    backupCount=5             # Keep 5 backup files
-)
-file_handler.setLevel(logging.DEBUG) # File handler will capture ALL debug messages
-file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(file_formatter)
-root_logger.addHandler(file_handler) # Add to root logger
+    # Configure File Logging
+    if settings_manager.get_boolean_setting('Logging', 'enable_file_logging', True):
+        log_file_path = settings_manager.get_setting('Logging', 'log_file_path', fallback='Debug_Logs/debug.log.txt')
+        os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
+        
+        file_level_str = settings_manager.get_setting('Logging', 'log_level_file', fallback='DEBUG').upper()
+        file_level = getattr(logging, file_level_str, logging.DEBUG)
 
-logger = logging.getLogger(__name__) # Get a logger instance for this module (main)
-logger.info("Main application logging configured.")
-logger.info("File logging ENABLED at DEBUG level to %s.", debug_log_file)
-
+        file_handler = logging.FileHandler(log_file_path)
+        file_handler.setLevel(file_level)
+        file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        file_handler.setFormatter(file_formatter)
+        root_logger.addHandler(file_handler)
+    
+    # Set the overall level for the root logger to the most verbose of its handlers
+    # This ensures that messages are passed to the handlers to be filtered.
+    root_logger.setLevel(logging.DEBUG) 
+    logger.info("Application logging configured from settings.")
 
 class MainWindow(QMainWindow):
     """
     The main application window for the Anavi Sensor Dashboard.
-    Manages UI, data flow, settings, sensor reading, and logging.
+    Manages overall UI, settings, data acquisition, and alerts.
     """
-    # Define a signal for global alert state changes (any sensor goes into/out of alert)
-    global_alert_state_changed = pyqtSignal(bool) # True if any sensor is in alert, False otherwise
-
-    def __init__(self, parent=None):
-        """Initializes the main window and all application components."""
-        super().__init__(parent)
-        self.setObjectName("MainWindow") # For QSS styling
-
-        logger.info("MainWindow: Application starting up.")
-
+    def __init__(self, settings_manager):
+        """Initializes the MainWindow."""
+        super().__init__()
         self.setWindowTitle("Anavi Sensor Dashboard")
-        # CORRECTED: Pass full path from resources to get_resource_path
-        self.setWindowIcon(QIcon(self.get_resource_path('images/icon.png'))) 
-        self.setMinimumSize(800, 600) # Minimum size for usability
+        self.setWindowIcon(QIcon(self.get_resource_path("icon.png", "img"))) 
+        self.setGeometry(100, 100, 1200, 800) 
 
-        # Validator for numeric input fields (thresholds, sampling rate)
-        # MOVED TO TOP for immediate availability
-        self.float_validator = QDoubleValidator()
-        # Set locale to ensure decimal separator is consistent (e.g., dot vs comma)
-        self.float_validator.setLocale(QLocale(QLocale.English, QLocale.UnitedStates))
-        self.float_validator.setDecimals(2) # Allow 2 decimal places
-        self.float_validator.setRange(-9999.0, 9999.0) # Broad range, adjust as needed
-        logger.info("MainWindow: float_validator initialized.")
+        # --- FIX 1: Create the status bar ---
+        self.setStatusBar(QStatusBar(self))
+        self.statusBar().showMessage("Status Bar Test: Ready")
 
 
-        # --- Data Management ---
-        # Initialize SettingsManager first, as other components depend on it
-        self.settings_manager = SettingsManager(config_file='config.ini', theme_dir='themes')
+        self.settings_manager = settings_manager
         
-        # Initialize DataStore
-        self.data_store = SensorDataStore(max_points=1000) # Store up to 1000 data points
-        # Set reference to thresholds in data store, as it might need them for internal logic later
-        # --- FIX: Ensure thresholds are loaded from settings_manager *immediately* for data_store ---
-        self.thresholds = self.settings_manager.get_all_thresholds() # Load initial thresholds immediately with proper casing
-        self.data_store.set_thresholds_reference(self.thresholds)
+        self.theme_colors = {} 
+        
+        self.thresholds = {}
+        self.data_store = SensorDataStore(self.settings_manager) 
 
-        # Initialize SensorLogger based on settings
-        self.sensor_logger_enabled = self.settings_manager.get_setting('General', 'data_log_enabled', type=bool)
-        self.sensor_logger_max_size_mb = self.settings_manager.get_setting('General', 'data_log_max_size_mb', type=float)
-        self.sensor_logger_max_rotations = self.settings_manager.get_setting('General', 'data_log_max_rotations', type=int)
+        self.sensor_logger = None 
 
-        self.sensor_logger = None
-        if self.sensor_logger_enabled:
-            try:
-                self.sensor_logger = SensorLogger(
-                    log_directory='Sensor_Logs',
-                    archive_directory='Archive_Sensor_Logs',
-                    max_file_size_mb=self.sensor_logger_max_size_mb, # Use current settings
-                    max_rotations=self.sensor_logger_max_rotations
-                )
-                logger.info("MainWindow: Sensor data logging initialized.")
-            except Exception as e:
-                logger.error(f"MainWindow: Failed to initialize SensorLogger: {e}. Data logging disabled.", exc_info=True)
-                self.sensor_logger_enabled = False # Disable if init fails
-                self.show_status_message("Error initializing data logger. Logging disabled.", "error")
-        else:
-            logger.info("MainWindow: Sensor data logging is DISABLED by settings.")
+        self.int_validator = QIntValidator(self)
+        self.double_validator = QDoubleValidator(self)
+        self.double_validator.setLocale(QLocale(QLocale.C)) 
+        self.double_validator.setNotation(QDoubleValidator.StandardNotation) 
+        logger.debug("MainWindow: Initialized QIntValidator and QDoubleValidator.")
 
-        # --- Sensor Reading Thread ---
-        # Pass settings_manager to SensorReaderThread for dynamic config updates
-        self.sensor_reader = SensorReaderThread(self.settings_manager)
-
+        self._setup_data_logger_with_config() 
+        
         # --- UI Initialization ---
-        # --- FIX: Ensure theme_colors is retrieved from SettingsManager BEFORE passing to UI ---
-        self.theme_colors = self.settings_manager.get_theme_colors() # Get initial theme colors
-        self._load_custom_fonts() # Load custom fonts (like Digital-7)
-        self.current_gauge_type = self.settings_manager.get_setting('General', 'current_gauge_type', type=str)
-        self.current_gauge_style = self.settings_manager.get_setting('General', 'current_gauge_style', type=str)
+        initial_gauge_type = self.settings_manager.get_setting('UI', 'gauge_type', fallback='Standard')
+        initial_gauge_style = self.settings_manager.get_setting('UI', 'gauge_style', fallback='Full')
+        initial_dashboard_plot_time_range = self.settings_manager.get_setting('General', 'dashboard_plot_time_range', fallback='Last 30 minutes')
+        initial_detail_plot_time_range = self.settings_manager.get_setting('General', 'detail_plot_time_range', fallback='Last 10 minutes')
+        initial_hide_matplotlib_toolbar = self.settings_manager.get_boolean_setting('UI', 'hide_matplotlib_toolbar', fallback=False)
+        initial_plot_update_interval_ms = self.settings_manager.get_int_setting('General', 'plot_update_interval_ms', fallback=1000)
 
-        # Pass parameters to AnaviSensorUI
-        self.ui = AnaviSensorUI(self.data_store, self.settings_manager, self.thresholds, self, self.theme_colors, self.current_gauge_type, self.current_gauge_style)
-        self.setCentralWidget(self.ui) # Set the tab widget as central widget
+        self.ui_tabs = AnaviSensorUI(
+            settings_manager=self.settings_manager,
+            theme_colors=self.theme_colors,
+            initial_gauge_type=initial_gauge_type,
+            initial_gauge_style=initial_gauge_style,
+            data_store=self.data_store,
+            thresholds=self.thresholds,
+            initial_dashboard_plot_time_range=initial_dashboard_plot_time_range,
+            initial_detail_plot_time_range=initial_detail_plot_time_range,
+            initial_hide_matplotlib_toolbar=initial_hide_matplotlib_toolbar,
+            initial_plot_update_interval_ms=initial_plot_update_interval_ms,
+            main_window=self 
+        )
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        main_layout = QVBoxLayout(central_widget)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+        main_layout.addWidget(self.ui_tabs)
+        logger.info("MainWindow: UI structure setup complete.")
 
-        self.status_bar = self.statusBar()
-        self.status_message_label = QLabel("Initializing sensors...")
-        self.status_message_label.setStyleSheet("color: white;") # Default status message color
-        self.status_bar.addWidget(self.status_message_label)
-        self.status_bar.setObjectName("StatusBar") # For QSS
-        logger.info("MainWindow: Status bar initialized.")
+        self.apply_stylesheet() 
+        self.load_custom_font() 
+        
+        self.thresholds.update(self.settings_manager.get_thresholds()) 
 
-        # Overall alert state management
-        self.is_any_sensor_in_alert = False # Flag to track global alert status
-        self.alert_sound_player = None
-        self._init_alert_sound()
+        self.setup_connections() 
 
-        # Tray Icon setup
-        self.tray_icon = QSystemTrayIcon(self)
-        self.tray_icon.setIcon(self.windowIcon())
-        self.tray_icon.setVisible(True)
-        self.create_tray_menu()
-        logger.info("MainWindow: System tray icon initialized.")
+        self.setup_sensor_thread() 
+        self.setup_alert_timer() 
 
-        # --- Signal Connections ---
-        self._connect_signals()
+        logger.info("Application starting up.")
+        self.ui_tabs.initialize_all_tab_data(self.theme_colors) 
+        logger.info("MainWindow: Initialization complete.")
 
-        # Apply initial QSS theme after all widgets are initialized
-        # This call will propagate theme colors to all tabs immediately after startup
-        self.apply_qss_theme(self.settings_manager.get_setting('General', 'current_theme', type=str))
-        logger.info("MainWindow: Initial QSS theme applied.")
+    
+    def show_alert_message(self, message, alert_type="info"):
+        """Displays a temporary alert message in a status bar or message box."""
+        logger.debug(f"show_alert_message called. Type: '{alert_type}', Message: '{message}'")
+        
+        notification_method = self.settings_manager.get_setting('General', 'notification_method', fallback='Popup')
+        logger.debug(f"  Notification method from settings: '{notification_method}'")
+        
+        if notification_method == 'Popup':
+            logger.debug("  Displaying notification as a Popup.")
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle(f"Sensor Alert - {alert_type.upper()}")
+            msg_box.setText(message)
+            
+            if alert_type == 'warning':
+                msg_box.setIcon(QMessageBox.Warning)
+            elif alert_type == 'critical':
+                msg_box.setIcon(QMessageBox.Critical)
+            else:
+                msg_box.setIcon(QMessageBox.Information)
 
-        # Start sensor reader thread
-        self.sensor_reader.start()
-        logger.info(f"MainWindow: SensorReaderThread (ID: {id(self.sensor_reader)}) started.")
+            app = QApplication.instance()
+            if app:
+                msg_box.setStyleSheet(app.styleSheet())
+            msg_box.exec_() 
+        
+        elif notification_method == 'Status Bar':
+            logger.debug("  Attempting to display notification on the Status Bar.")
+            if self.statusBar():
+                # This logic now looks for specific theme keys for each alert type
+                if alert_type == 'critical':
+                    bg_color = self.theme_colors.get('statusbar_critical_bg', QColor('#d32f2f'))
+                    fg_color = self.theme_colors.get('statusbar_critical_fg', QColor('white'))
+                elif alert_type == 'warning':
+                    bg_color = self.theme_colors.get('statusbar_warning_bg', QColor('#ffa000'))
+                    fg_color = self.theme_colors.get('statusbar_warning_fg', QColor('black'))
+                else: # Normal info
+                    bg_color = self.theme_colors.get('statusbar_bg', QColor('#1976d2'))
+                    fg_color = self.theme_colors.get('statusbar_fg', QColor('white'))
 
-        # Initial population of UI data
-        self.ui.initialize_all_tab_data() # This will trigger plot updates etc.
-        logger.info("MainWindow: Initial UI data population triggered.")
+                logger.debug(f"  Status bar colors determined: BG='{bg_color.name()}', FG='{fg_color.name()}'")
+                
+                stylesheet = f"QStatusBar {{ background-color: {bg_color.name()}; color: {fg_color.name()}; font-weight: bold; }}"
+                self.statusBar().setStyleSheet(stylesheet)
+                self.statusBar().showMessage(message, 10000)
+            else:
+                logger.warning("  Could not show status bar message because the statusBar object does not exist.")
 
-        # Trigger initial gauge style propagation to ensure all display widgets pick up settings
-        self.ui.propagate_gauge_style_change(self.current_gauge_type, self.current_gauge_style)
-        logger.info("MainWindow: Initial gauge style propagation triggered.")
+    @pyqtSlot()
+    def clear_alert_message(self):
+        """Clears the alert message from the status bar."""
+        if self.statusBar():
+            self.statusBar().clearMessage()
+            self.statusBar().setStyleSheet("")        
 
-        # Initial thresholds propagation to display widgets
-        # This is CRITICAL to ensure all SensorDisplayWidgets get correct, updated thresholds on startup
-        self.ui.update_thresholds_for_display_widgets(self.thresholds)
-        logger.info("MainWindow: Initial thresholds propagation to display widgets triggered.")
+    def _repolish_all_widgets(self):
+        """Forces all widgets in the application to re-apply their stylesheet."""
+        app = QApplication.instance()
+        if app:
+            for widget in app.allWidgets():
+                widget.style().unpolish(widget)
+                widget.style().polish(widget)
+        logger.debug("MainWindow: Repolished all widgets for theme update.")
 
-        logger.info("MainWindow: Application initialization complete.")
+    def get_resource_path(self, relative_path, resource_type=None):
+        """
+        Determines the absolute path to a resource file.
+        """
+        if hasattr(sys, '_MEIPASS'):
+            base_path = sys._MEIPASS
+        else:
+            base_path = os.path.abspath(os.path.dirname(__file__))
 
+        resource_dir_parts = [base_path, "resources"]
+        if resource_type: 
+            resource_dir_parts.append(resource_type)
+            
+        resource_dir = os.path.join(*resource_dir_parts)
+        full_path = os.path.join(resource_dir, relative_path)
+        return full_path
+    
+    def _setup_data_logger_with_config(self):
+        """
+        Configures the SENSOR DATA logger based on settings from config.ini.
+        """
+        data_log_enabled = self.settings_manager.get_boolean_setting('General', 'data_log_enabled', fallback=False)
+        if data_log_enabled:
+            max_size_mb = self.settings_manager.get_float_setting('General', 'data_log_max_size_mb', fallback=5.0)
+            max_rotations = self.settings_manager.get_int_setting('General', 'data_log_max_rotations', fallback=5)
+            
+            if self.sensor_logger:
+                self.sensor_logger.close() 
 
-    def _load_custom_fonts(self):
-        """Loads custom fonts (like Digital-7) into the QFontDatabase."""
-        # CORRECTED: Pass the path including the 'fonts/' subdirectory
-        font_path = self.get_resource_path("fonts/digital-7.ttf")
+            self.sensor_logger = SensorLogger(
+                log_dir=self.get_resource_path("Sensor_Logs", "logs"), 
+                archive_dir=self.get_resource_path("Archive_Sensor_Logs", "logs"),
+                max_file_size_mb=max_size_mb,
+                max_rotations=max_rotations
+            )
+            self.data_store.data_updated.connect(
+                lambda data: self.sensor_logger.log_sensor_data(data, self.settings_manager)
+            )
+            logger.info("Sensor data logging ENABLED.")
+        else:
+            if self.sensor_logger:
+                try:
+                    self.data_store.data_updated.disconnect(
+                        lambda data: self.sensor_logger.log_sensor_data(data, self.settings_manager)
+                    )
+                except (TypeError, RuntimeError):
+                    pass
+                self.sensor_logger.close()
+                self.sensor_logger = None
+            logger.info("Sensor data logging DISABLED.")    
+
+    def load_custom_font(self):
+        """Loads a custom font (e.g., Inter) from resources if available."""
+        font_path = self.get_resource_path("Inter-Regular.ttf", "fonts")
         if os.path.exists(font_path):
             font_id = QFontDatabase.addApplicationFont(font_path)
             if font_id != -1:
                 font_families = QFontDatabase.applicationFontFamilies(font_id)
                 if font_families:
-                    logger.info(f"MainWindow: Successfully loaded custom font: {font_families[0]}.")
-                else:
-                    logger.warning(f"MainWindow: Loaded font at {font_path}, but no family names found.")
-            else:
-                logger.error(f"MainWindow: Failed to add custom font from {font_path} to database.")
+                    QApplication.instance().setFont(QFont(font_families[0]))
+                    logger.info(f"Custom font '{font_families[0]}' loaded and set as default application font.")
+                    self.settings_manager.set_theme_color('plot_font_family', [font_families[0], 'sans-serif'])
+                    return
+            logger.warning(f"Failed to load custom font from {font_path}. Using default system font.")
         else:
-            logger.warning(f"MainWindow: Custom font file 'digital-7.ttf' not found at {font_path}. Digital gauge might not display correctly.")
+            logger.warning(f"Custom font file not found at {font_path}. Using default system font.")
+        self.settings_manager.set_theme_color('plot_font_family', ['sans-serif'])            
 
-    def _init_alert_sound(self):
-        """Initializes the QSound object for alert sounds."""
-        # CORRECTED: Pass the path including the 'sounds/' subdirectory
-        sound_file = self.get_resource_path("sounds/alert.wav")
-        if os.path.exists(sound_file):
-            self.alert_sound_player = QSound(sound_file, self) # Parent to self
-            logger.info(f"MainWindow: Alert sound initialized from {sound_file}.")
-        else:
-            self.alert_sound_player = None
-            logger.warning(f"MainWindow: Alert sound file '{sound_file}' not found. Alert sounds disabled.")
-
-    def get_resource_path(self, relative_path):
-        """
-        Get the absolute path to a resource, handling both development and PyInstaller one-file builds.
-        :param relative_path: The path relative to the 'resources' directory (e.g., 'images/icon.png').
-        """
-        try:
-            # PyInstaller creates a temp folder and stores path in _MEIPASS
-            base_path = sys._MEIPASS
-        except Exception:
-            base_path = os.path.abspath(".")
-        
-        # CHANGED: Join directly with relative_path, assuming it now includes subdirs like 'fonts/' or 'images/'
-        resource_path = os.path.join(base_path, 'resources', relative_path)
-        logger.debug(f"MainWindow: Resolved resource path for '{relative_path}': {resource_path}")
-        return resource_path
-
-
-    def _connect_signals(self):
-        """Connects all necessary signals and slots."""
-        logger.info("MainWindow: Connecting signals.")
-        # Connect sensor reader's data_ready signal to UI's update method
-        self.sensor_reader.data_ready.connect(self.data_store.add_data)
-        self.sensor_reader.sensor_status_update.connect(self.show_status_message)
-
-        # Connect data store's data_updated signal to UI's display update method
-        self.data_store.data_updated.connect(self.ui.update_sensor_displays)
-        # Connect data_store data_updated to log data to file
-        self.data_store.data_updated.connect(self.log_sensor_data_to_file)
-
-        # Connect UI customization changes from AnaviSensorUI to MainWindow's method to save settings
-        self.ui.ui_customization_changed.connect(self.on_ui_customization_changed)
-        # Connect theme change signal from AnaviSensorUI (which relays from SettingsTab)
-        self.ui.theme_changed.connect(self.apply_qss_theme)
-        # Connect thresholds_updated signal from AnaviSensorUI (which relays from SettingsTab)
-        self.ui.thresholds_updated.connect(self.on_thresholds_updated_from_ui)
-
-        # Connect alert state changes from individual SensorDisplayWidgets (via UI tabs)
-        self.global_alert_state_changed.connect(self.on_global_alert_status_changed)
-
-        # Connect tray icon signal
-        self.tray_icon.activated.connect(self.on_tray_icon_activated)
-        
-        # Connect settings manager settings_updated signal to log_level_changed
-        self.settings_manager.settings_updated.connect(self._on_settings_manager_updated)
-        
-        logger.info("MainWindow: All signals connected.")
+    def setup_connections(self):
+        """Sets up connections for signals and slots."""
+        self.data_store.data_updated.connect(self.ui_tabs.update_sensor_values) 
+        self.ui_tabs.ui_customization_changed.connect(self.handle_ui_customization_change)
+        self.ui_tabs.theme_changed.connect(self.apply_stylesheet_by_name)
+        self.ui_tabs.thresholds_updated.connect(self.update_thresholds)
+        self.ui_tabs.alert_triggered.connect(self.handle_alert_triggered)
+        self.ui_tabs.alert_cleared.connect(self.handle_alert_cleared)
+        self.settings_manager.settings_updated.connect(self._on_settings_updated)
+        self.data_store.sensors_discovered.connect(self.ui_tabs.settings_tab.update_available_sensors)
 
     @pyqtSlot(str, str, object)
-    def _on_settings_manager_updated(self, section, key, value):
+    def _on_settings_updated(self, section, key, value):
         """
-        Slot to handle updates from SettingsManager and propagate them
-        to relevant parts of MainWindow, specifically for logging and data log config.
+        Slot to handle general settings updates.
         """
-        logger.debug(f"MainWindow: Received setting update from SettingsManager: [{section}]{key} = {value}")
-        if section == 'General':
-            if key == 'data_log_enabled':
-                self.sensor_logger_enabled = value
-                if self.sensor_logger_enabled and self.sensor_logger is None:
-                    # Initialize logger if enabled and not already initialized
-                    try:
-                        self.sensor_logger = SensorLogger(
-                            log_directory='Sensor_Logs',
-                            archive_directory='Archive_Sensor_Logs',
-                            max_file_size_mb=self.sensor_logger_max_size_mb, # Use current settings
-                            max_rotations=self.sensor_logger_max_rotations
-                        )
-                        logger.info("MainWindow: Sensor data logging re-enabled and initialized via settings update.")
-                        self.show_status_message("Data logging enabled.", "info")
-                    except Exception as e:
-                        logger.error(f"MainWindow: Failed to re-initialize SensorLogger after enabling: {e}. Data logging disabled.", exc_info=True)
-                        self.sensor_logger_enabled = False
-                        self.show_status_message("Error re-enabling data logger. Logging disabled.", "error")
-                elif not self.sensor_logger_enabled and self.sensor_logger:
-                    # Close logger if disabled
-                    self.sensor_logger.close()
-                    self.sensor_logger = None
-                    logger.info("MainWindow: Sensor data logging disabled via settings update.")
-                    self.show_status_message("Data logging disabled.", "info")
-
-            elif key == 'data_log_max_size_mb':
-                self.sensor_logger_max_size_mb = value
-                if self.sensor_logger:
-                    self.sensor_logger.max_file_size_bytes = value * 1024 * 1024
-                    logger.info(f"MainWindow: SensorLogger max file size updated to {value}MB.")
-            
-            elif key == 'data_log_max_rotations':
-                self.sensor_logger_max_rotations = value
-                if self.sensor_logger:
-                    self.sensor_logger.max_rotations = value
-                    logger.info(f"MainWindow: SensorLogger max rotations updated to {value}.")
-            
-            elif key == 'alert_sound_enabled':
-                # No direct action needed here, on_global_alert_status_changed will check setting
-                pass
-            
-            elif key == 'current_theme':
-                # This is already connected directly to apply_qss_theme via ui.theme_changed
-                pass
-
-    def log_sensor_data_to_file(self, sensor_data):
-        """
-        Logs the incoming sensor data to a CSV file using SensorLogger.
-        This method is connected to `data_store.data_updated`.
-        `sensor_data` is the 'data' part of the snapshot from DataStore.
-        """
-        if self.sensor_logger and self.sensor_logger_enabled:
-            # We need to reconstruct the full snapshot format for SensorLogger, including timestamp
-            # Use the latest timestamp from data_store for consistency
-            latest_snapshot = self.data_store.get_latest_data() # This returns the 'data' part
-            # Full snapshot from data_store.get_latest_data() should be {'timestamp': ..., 'data': { ... }}
-            # If get_latest_data() only returns the 'data' part, we need to adjust or ensure it returns full snapshot
-            # For robustness, we construct it, ensuring timestamp is available.
-            full_snapshot_for_logging = {'timestamp': int(time.time() * 1000), 'data': sensor_data}
-            if latest_snapshot and 'timestamp' in latest_snapshot:
-                 full_snapshot_for_logging['timestamp'] = latest_snapshot['timestamp']
-            
-            # Prepare alert status for logging
-            alert_status = {}
-            for sensor_type, metrics in sensor_data.items():
-                for metric_type, metric_value_data in metrics.items():
-                    metric_key = f"{sensor_type}_{metric_type}"
-                    # Check if this specific metric is in alert state
-                    # This logic should ideally be managed by SensorDisplayWidget emitting signals
-                    # and MainWindow aggregating global alert status.
-                    # For logging, we'll check against current thresholds.
-                    value = metric_value_data.get('value')
-                    if value is not None:
-                        # --- FIX: Ensure lowercase lookup for thresholds when logging alert status ---
-                        low_thr = self.thresholds.get(sensor_type.lower(), {}).get(metric_type.lower(), {}).get('low')
-                        high_thr = self.thresholds.get(sensor_type.lower(), {}).get(metric_type.lower(), {}).get('high')
-                        is_alert = False
-                        if low_thr is not None and high_thr is not None:
-                            if value < low_thr or value > high_thr:
-                                is_alert = True
-                        alert_status[metric_key] = is_alert
-            
-            self.sensor_logger.log_sensor_data_to_file(full_snapshot_for_logging, alert_status)
-            logger.debug("MainWindow: Logged sensor data to file via SensorLogger.")
-        else:
-            logger.debug("MainWindow: Sensor data logging is disabled or logger not initialized. Skipping file log.")
-
-    def show_status_message(self, message, message_type="info"):
-        """
-        Displays a status message in the status bar with a specific color.
-        :param message: The message string.
-        :param message_type: 'info', 'warning', or 'error'.
-        """
-        color = "white" # Default
-        if message_type == "info":
-            color = "white"
-        elif message_type == "warning":
-            color = "orange"
-        elif message_type == "error":
-            color = "red"
+        if section == 'General' and key in ['data_log_enabled', 'data_log_max_size_mb', 'data_log_max_rotations']:
+            self._setup_data_logger_with_config() 
         
-        self.status_message_label.setText(message)
-        self.status_message_label.setStyleSheet(f"color: {color};")
-        logger.debug(f"MainWindow: Status message displayed: [{message_type}] {message}")
+        if section == 'General' and key == 'sampling_rate_ms':
+            if hasattr(self, 'sensor_reader') and self.sensor_reader:
+                self.sensor_reader.set_sampling_rate(int(value))
 
-    @pyqtSlot(str)
-    def apply_qss_theme(self, theme_file_name):
-        """
-        Applies the specified QSS theme file to the entire application.
-        :param theme_file_name: The name of the QSS file (e.g., 'blue_theme.qss').
-        """
-        theme_path = os.path.join(self.settings_manager.theme_dir, theme_file_name)
-        if os.path.exists(theme_path):
-            try:
-                with open(theme_path, 'r') as f:
-                    self.setStyleSheet(f.read())
-                
-                # Update the internal theme_colors dictionary in settings_manager
-                self.settings_manager._load_theme_colors() # Force reload theme colors for drawing
-                self.theme_colors.clear() # Clear old colors
-                self.theme_colors.update(self.settings_manager.get_theme_colors()) # Update with newly parsed colors
+        if section == 'General' and key == 'data_store_max_points':
+            self.data_store.max_points = int(value)
+            self.data_store.data_history = collections.deque(self.data_store.data_history, maxlen=int(value))
 
-                # Propagate theme colors to UI tabs
-                if self.ui:
-                    self.ui.update_theme_colors_globally(self.theme_colors)
-                
-                logger.info(f"MainWindow: Applied QSS theme from {theme_file_name}.")
-                self.show_status_message(f"Theme changed to: {theme_file_name.replace('.qss', '').replace('_', ' ').title()}", "info")
-            except Exception as e:
-                logger.error(f"MainWindow: Error applying QSS theme from '{theme_path}': {e}", exc_info=True)
-                self.show_status_message(f"Failed to apply theme {theme_file_name}. Error: {e}", "error")
-        else:
-            logger.warning(f"MainWindow: QSS theme file '{theme_path}' not found. Cannot apply theme.")
-            self.show_status_message(f"Theme file '{theme_file_name}' not found.", "warning")
-
-    @pyqtSlot(str, str, bool)
-    def on_sensor_alert_state_changed(self, sensor_category, metric_type, is_alert):
-        """
-        Receives alert state changes from individual SensorDisplayWidgets and
-        updates the global alert state and plays sound if enabled.
-        """
-        logger.debug(f"MainWindow: Alert state change received for {sensor_category}-{metric_type}: {is_alert}")
+    def setup_sensor_thread(self):
+        """Sets up a QThread for sensor data acquisition using SensorReaderThread."""
+        self.sensor_thread = QThread()
         
-        # Determine if ANY sensor is currently in an alert state
-        # Iterate through all display widgets to check their individual alert status
-        any_alert = False
-        
-        # Check DashboardTab's widgets
-        if self.ui.dashboard_tab:
-            for widget_key, widget in self.ui.dashboard_tab.sensor_display_widgets.items():
-                if widget._is_alert: # Access the internal alert state
-                    any_alert = True
-                    break
-            if any_alert: # If alert found in dashboard, no need to check details tab
-                pass
-        
-        # If no alert yet, check SensorDetailsTab's widgets
-        if not any_alert and self.ui.sensor_details_tab:
-            for widget_key, widget in self.ui.sensor_details_tab.sensor_display_widgets.items():
-                if widget._is_alert:
-                    any_alert = True
-                    break
+        sensor_config = self.settings_manager.get_sensor_configurations()
+        mock_mode = self.settings_manager.get_boolean_setting('General', 'mock_mode')
+        sampling_rate = self.settings_manager.get_int_setting('General', 'sampling_rate_ms')
 
-        # Emit global signal only if the overall status has changed
-        if any_alert != self.is_any_sensor_in_alert:
-            self.is_any_sensor_in_alert = any_alert
-            self.global_alert_state_changed.emit(self.is_any_sensor_in_alert)
-            logger.info(f"MainWindow: Global alert status changed to: {self.is_any_sensor_in_alert}.")
-        else:
-            logger.debug(f"MainWindow: Global alert status remains {self.is_any_sensor_in_alert}.")
+        self.sensor_reader = SensorReaderThread(
+            data_store=self.data_store,
+            mock_mode=mock_mode,
+            sampling_rate_ms=sampling_rate,
+            sensor_config=sensor_config
+        )
+        self.sensor_reader.moveToThread(self.sensor_thread)
 
+        self.sensor_thread.started.connect(self.sensor_reader.run)
+        self.sensor_reader.finished.connect(self.sensor_thread.quit)
+        self.sensor_reader.finished.connect(self.sensor_reader.deleteLater)
+        self.sensor_thread.finished.connect(self.sensor_thread.deleteLater)
 
-    @pyqtSlot(bool)
-    def on_global_alert_status_changed(self, is_global_alert):
-        """
-        Handles changes in the global alert status (any sensor in alert).
-        Plays alert sound if enabled.
-        """
-        logger.info(f"MainWindow: Global alert status updated to: {is_global_alert}.")
-        alert_sound_enabled = self.settings_manager.get_setting('General', 'alert_sound_enabled', type=bool)
+        self.sensor_reader.data_ready.connect(self.data_store.add_data)
+        self.sensor_reader.sensors_discovered.connect(self.data_store.update_available_sensors)
 
-        if is_global_alert:
-            self.show_status_message("ALERT: One or more sensors are out of threshold!", "error")
-            if alert_sound_enabled and self.alert_sound_player:
-                if not self.alert_sound_player.isFinished():
-                    self.alert_sound_player.stop() # Stop if already playing to restart
-                self.alert_sound_player.play()
-                logger.info("MainWindow: Playing alert sound.")
-            elif not self.alert_sound_player:
-                logger.warning("MainWindow: Alert sound enabled in settings, but sound player not initialized.")
-        else:
-            self.show_status_message("All sensors within normal limits.", "info")
-            if self.alert_sound_player and not self.alert_sound_player.isFinished():
-                self.alert_sound_player.stop()
-                logger.info("MainWindow: Stopped alert sound.")
+        self.sensor_thread.start()
+
+    def setup_alert_timer(self):
+        """Sets up a timer for clearing temporary alerts."""
+        self.alert_clear_timer = QTimer(self)
+        self.alert_clear_timer.setInterval(10000) 
+        self.alert_clear_timer.setSingleShot(True)
+        self.alert_clear_timer.timeout.connect(self.clear_alert_message)
+
+    @pyqtSlot(str, str, str, str)
+    def handle_alert_triggered(self, sensor_category, metric_type, alert_type, message):
+        """Handles when a sensor alert is triggered."""
+        logger.warning(f"ALERT: {message}")
+        self.show_alert_message(message, alert_type)
 
     @pyqtSlot(str, str)
-    def on_ui_customization_changed(self, gauge_type, gauge_style):
+    def handle_alert_cleared(self, sensor_category, metric_type):
+        """Handles when a sensor alert is cleared."""
+        self.alert_clear_timer.start() 
+
+    def show_alert_message(self, message, alert_type="info"):
+        """Displays a temporary alert message in a status bar or message box."""
+        notification_method = self.settings_manager.get_setting('General', 'notification_method', fallback='Popup')
+        
+        if notification_method == 'Popup':
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle(f"Sensor Alert - {alert_type.upper()}")
+            msg_box.setText(message)
+            
+            # --- FIX: Check for 'warning' and 'critical' ---
+            if alert_type == 'warning':
+                msg_box.setIcon(QMessageBox.Warning)
+            elif alert_type == 'critical':
+                msg_box.setIcon(QMessageBox.Critical)
+            else:
+                msg_box.setIcon(QMessageBox.Information)
+
+            # Apply the global stylesheet to the message box
+            app = QApplication.instance()
+            if app:
+                msg_box.setStyleSheet(app.styleSheet())
+            msg_box.exec_() 
+        elif notification_method == 'Status Bar':
+            if self.statusBar():
+                status_color = self.theme_colors.get('statusbar_bg', QColor('red')) 
+                status_text_color = self.theme_colors.get('statusbar_color', QColor('white'))
+                self.statusBar().setStyleSheet(f"QStatusBar {{ background-color: {status_color.name()}; color: {status_text_color.name()}; }}")
+                self.statusBar().showMessage(message, 10000) 
+
+    @pyqtSlot()
+    def clear_alert_message(self):
+        """Clears the alert message from the status bar."""
+        if self.statusBar():
+            self.statusBar().clearMessage()
+            self.statusBar().setStyleSheet("") 
+
+    @pyqtSlot(str)
+    def apply_stylesheet_by_name(self, theme_file_name):
         """
-        Handles UI customization changes (gauge type/style) from AnaviSensorUI
-        and saves them to settings.
+        Loads, processes, and applies a QSS stylesheet to the ENTIRE application.
         """
-        logger.info(f"MainWindow: UI customization changed: Type='{gauge_type}', Style='{gauge_style}'. Saving settings.")
-        self.settings_manager.set_setting('General', 'current_gauge_type', gauge_type)
-        self.settings_manager.set_setting('General', 'current_gauge_style', gauge_style)
-        logger.debug("MainWindow: UI customization settings saved.")
+        self.settings_manager.set_setting('General', 'current_theme', theme_file_name)
+        
+        stylesheet = self.settings_manager.get_theme_stylesheet() 
+        
+        if stylesheet:
+            app = QApplication.instance()
+            if app:
+                app.setStyleSheet(stylesheet)
+            
+            new_colors = self.settings_manager.get_theme_colors()
+            self.theme_colors.clear()
+            self.theme_colors.update(new_colors)
+            
+            self._repolish_all_widgets()
+            
+            if hasattr(self, 'ui_tabs') and self.ui_tabs:
+                self.ui_tabs.update_theme_colors_globally(self.theme_colors)
+                
+            logger.info(f"MainWindow: Successfully applied new theme: {theme_file_name}")
+        else:
+            logger.error(f"MainWindow: Stylesheet for '{theme_file_name}' could not be processed.")
+            app = QApplication.instance()
+            if app:
+                app.setStyleSheet("")
+
+    def apply_stylesheet(self):
+        """
+        Applies the stylesheet that is currently configured in the settings.
+        """
+        current_theme_file = self.settings_manager.get_setting('General', 'current_theme', fallback='arctic_ice_theme.qss')
+        self.apply_stylesheet_by_name(current_theme_file)
+
+    @pyqtSlot(str, str) 
+    def handle_ui_customization_change(self, gauge_type, gauge_style):
+        """
+        Handles changes to UI customization settings (gauge type/style).
+        """
+        logger.info(f"MainWindow: UI customization changed - Gauge Type: {gauge_type}, Style: {gauge_style}")
 
     @pyqtSlot(dict)
-    def on_thresholds_updated_from_ui(self, new_thresholds_dict):
+    def update_thresholds(self, updated_thresholds):
         """
-        Receives the full updated thresholds dictionary from the UI (SettingsTab via AnaviSensorUI).
-        This method updates the global thresholds dictionary reference in MainWindow
-        and ensures settings_manager saves them, then propagates to data_store and UI.
+        Updates the internal thresholds dictionary and propagates it.
         """
-        logger.info("MainWindow: Received thresholds update from UI. Propagating and saving.")
-        # Update the global thresholds dictionary itself
         self.thresholds.clear()
-        self.thresholds.update(new_thresholds_dict)
-        logger.debug(f"MainWindow: Global thresholds dictionary updated to: {self.thresholds}")
-
-        # Save each individual threshold setting via settings_manager
-        for sensor_type, metrics in new_thresholds_dict.items():
-            for metric_type, limits in metrics.items():
-                if 'low' in limits:
-                    # Construct key using the original casing from new_thresholds_dict (which is lowercase here)
-                    key = f"{sensor_type}_{metric_type}_low" 
-                    # Convert None to empty string for configparser
-                    value = str(limits['low']) if limits['low'] is not None else ''
-                    self.settings_manager.set_setting('Thresholds', key, value)
-                if 'high' in limits:
-                    key = f"{sensor_type}_{metric_type}_high"
-                    value = str(limits['high']) if limits['high'] is not None else ''
-                    self.settings_manager.set_setting('Thresholds', key, value)
-        
-        logger.info("MainWindow: Thresholds saved via SettingsManager.")
-        
-        # Propagate the updated thresholds to data_store (if needed, already by reference)
-        # and to UI display widgets (which is handled by ui.update_thresholds_for_display_widgets)
-        self.ui.update_thresholds_for_display_widgets(self.thresholds)
-        logger.info("MainWindow: Thresholds propagated to UI display widgets.")
-
-    def create_tray_menu(self):
-        """Creates the system tray icon menu."""
-        tray_menu = QMenu(self)
-
-        show_action = QAction("Show Window", self)
-        show_action.triggered.connect(self.showNormal)
-        tray_menu.addAction(show_action)
-
-        hide_action = QAction("Hide Window", self)
-        hide_action.triggered.connect(self.hide)
-        tray_menu.addAction(hide_action)
-        
-        # Add 'Restore' option which typically brings the window back to normal state
-        restore_action = QAction("Restore", self)
-        restore_action.triggered.connect(self.showNormal)
-        tray_menu.addAction(restore_action)
-
-        # Add 'Quit' option
-        quit_action = QAction("Quit", self)
-        quit_action.triggered.connect(QApplication.instance().quit)
-        tray_menu.addAction(quit_action)
-
-        self.tray_icon.setContextMenu(tray_menu)
-        logger.debug("MainWindow: Tray menu created.")
-
-    def on_tray_icon_activated(self, reason):
-        """Handles activation events from the system tray icon."""
-        if reason == QSystemTrayIcon.Trigger: # Click
-            self.showNormal() # Restore the window
-        elif reason == QSystemTrayIcon.DoubleClick: # Double click
-            self.showNormal() # Restore the window
+        self.thresholds.update(updated_thresholds)
+        latest_data = self.data_store.get_latest_data()
+        if latest_data:
+            self.ui_tabs.update_sensor_values(latest_data)
+        self.ui_tabs.dashboard_tab._on_plot_timer_timeout()
+        self.ui_tabs.sensor_details_tab.update_all_plots()
+        self.ui_tabs.plot_tab.update_plot()
+        if self.ui_tabs.ui_customization_tab.preview_gauge:
+            self.ui_tabs.ui_customization_tab.preview_gauge.thresholds = {
+                'low_threshold': self.settings_manager.get_threshold('HTU21D', 'temperature', 'low_threshold'),
+                'high_threshold': self.settings_manager.get_threshold('HTU21D', 'temperature', 'high_threshold')
+            }
+            self.ui_tabs.ui_customization_tab.preview_gauge.update_value(self.ui_tabs.ui_customization_tab.preview_gauge._current_value) 
 
     def closeEvent(self, event):
-        """Handles the close event for the main window."""
-        logger.info("MainWindow: Application closing.")
+        """Handles the close event of the main window."""
+        logger.info("Application closing down.")
+        if hasattr(self, 'sensor_reader') and self.sensor_reader:
+            self.sensor_reader.stop()
+        if hasattr(self, 'sensor_thread') and self.sensor_thread.isRunning():
+            self.sensor_thread.quit()
+            self.sensor_thread.wait(5000) 
+            if self.sensor_thread.isRunning():
+                self.sensor_thread.terminate() 
         
-        # Stop sensor reader thread gracefully
-        if self.sensor_reader:
-            logger.info(f"MainWindow: Stopping SensorReaderThread (ID: {id(self.sensor_reader)}) in closeEvent.")
-            self.sensor_reader.stop() 
-            self.sensor_reader.wait() # Wait for the thread to finish
-            logger.info("MainWindow: Sensor reader gracefully stopped and waited.")
-        
-        # Save any pending settings
-        self.settings_manager.save_settings() 
-        logger.info("MainWindow: Settings saved on exit.")
-        
-        # Close sensor data logger if active
         if self.sensor_logger:
             self.sensor_logger.close() 
-            logger.info("MainWindow: Sensor data logger closed.")
+            self.sensor_logger.cleanup() 
+        
+        self.data_store.cleanup()
+        self.settings_manager.save_settings() 
+        logger.info("Application shutdown complete.")
+        super().closeEvent(event)
 
-        logger.info("Application exit complete.")
-        event.accept()
 
-
-# --- Application Entry Point ---
 if __name__ == "__main__":
-    QCoreApplication.setAttribute(Qt.AA_EnableHighDpiScaling) 
-    QCoreApplication.setAttribute(Qt.AA_UseHighDpiPixmaps) 
-
     app = QApplication(sys.argv)
     
-    window = MainWindow()
+    settings = SettingsManager()
+    setup_logging(settings)
+
+    window = MainWindow(settings)
     window.show()
     sys.exit(app.exec_())
-

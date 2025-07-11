@@ -1,587 +1,520 @@
+# widgets/settings_tab.py
 # -*- coding: utf-8 -*-
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QLineEdit, QPushButton, QComboBox, QCheckBox, QSizePolicy, QSpacerItem, QFormLayout
-from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QFont, QFontDatabase, QColor # Import QColor
-
 import logging
+from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, 
+                             QLineEdit, QPushButton, QComboBox, QCheckBox,
+                             QSizePolicy, QScrollArea, QFormLayout, QSpacerItem)
+from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot
+from PyQt5.QtGui import QIntValidator, QDoubleValidator, QFont, QFontDatabase, QColor
+from functools import partial
+import re
 
-from data_management.settings import SettingsManager # For accessing static _format_name_for_qss
-from widgets.sensor_display import SensorDisplayWidget # For preview gauge
+from data_management.settings import SettingsManager
+from widgets.sensor_display import SensorDisplayWidget
 
 logger = logging.getLogger(__name__)
 
 class SettingsTab(QWidget):
-    """
-    Settings tab allowing users to configure application parameters,
-    including sensor settings, themes, and alert thresholds.
-    """
-    # Signal emitted when UI customization (gauge type/style) changes.
-    # This is re-emitted by AnaviSensorUI to MainWindow.
-    ui_customization_changed = pyqtSignal(str, str) # Arguments: gauge_type (str), gauge_style (str)
-    
-    # Signal emitted when the theme changes.
-    # This is re-emitted by AnaviSensorUI to MainWindow.
-    theme_changed = pyqtSignal(str) # Argument: theme_file_name (str)
+    settings_changed = pyqtSignal()
+    # --- FIX: Re-add thresholds_updated_signal ---
+    thresholds_updated_signal = pyqtSignal(dict) 
+    # --- END FIX ---
 
-    # Signal emitted when thresholds are updated by the user.
-    # This is re-emitted by AnaviSensorUI to MainWindow.
-    thresholds_updated = pyqtSignal(dict) # Argument: full_thresholds_dict
+    ui_customization_changed = pyqtSignal(str, str) 
+    theme_changed = pyqtSignal(str) 
 
-    def __init__(self, settings_manager, main_window, theme_colors, initial_gauge_type, initial_gauge_style, parent=None):
+    def __init__(self, settings_manager, theme_colors,
+                 main_window, data_store, thresholds, 
+                 parent=None):
         super().__init__(parent)
-        self.setObjectName("SettingsTab") # Added object name for QSS
-        self.settings_manager = settings_manager
-        self.main_window = main_window # Store reference to MainWindow for global access
-        self.theme_colors = theme_colors # Reference to the global theme colors
-        
-        # Store initial gauge type and style from main window for preview gauge setup
-        self.initial_gauge_type = initial_gauge_type
-        self.initial_gauge_style = initial_gauge_style
+        self.setObjectName("SettingsTab")
 
-        self.preview_gauge = None # Will be initialized in setup_ui
+        self.settings_manager = settings_manager
+        self.theme_colors = theme_colors
+        self.main_window = main_window
+        self.data_store = data_store
+        self.thresholds = thresholds 
+
+        self.sensor_config_widgets = {}
+        self.precision_line_edits = {}
+        self.threshold_line_edits = {} 
+        self.range_inputs = {}
 
         self.setup_ui()
-        self.load_settings_to_ui()
-        self.connect_signals()
+        self.setup_connections()
+        self.load_settings() 
         logger.info("SettingsTab initialized.")
 
     def setup_ui(self):
-        """Sets up the layout and widgets for the settings tab."""
+        """Sets up the layout and initial widgets for the Settings tab."""
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(10, 10, 10, 10)
-        main_layout.setSpacing(15)
-
-        # --- General Settings Group ---
-        general_group = QGroupBox("General Settings")
-        general_group.setObjectName("SettingsGroupBox")
-        general_layout = QFormLayout(general_group)
-        general_layout.setContentsMargins(10, 20, 10, 10)
-        general_layout.setSpacing(10)
-
-        self.mock_mode_checkbox = QCheckBox("Enable Mock Sensor Data")
-        self.mock_mode_checkbox.setObjectName("SettingsCheckBox")
-        general_layout.addRow(self.mock_mode_checkbox)
-
-        self.sampling_rate_input = QLineEdit()
-        self.sampling_rate_input.setObjectName("SettingsLineEdit")
-        self.sampling_rate_input.setPlaceholderText("e.g., 5000 (ms)")
-        general_layout.addRow(QLabel("Sensor Sampling Rate (ms):"), self.sampling_rate_input)
-
-        self.alert_sound_checkbox = QCheckBox("Enable Alert Sounds")
-        self.alert_sound_checkbox.setObjectName("SettingsCheckBox")
-        general_layout.addRow(self.alert_sound_checkbox)
-
-        self.current_theme_combo = QComboBox()
-        self.current_theme_combo.setObjectName("SettingsComboBox")
-        self.populate_themes()
-        general_layout.addRow(QLabel("Application Theme:"), self.current_theme_combo)
-
-        main_layout.addWidget(general_group)
-
-        # --- UI Customization Group ---
-        ui_custom_group = QGroupBox("UI Customization")
-        ui_custom_group.setObjectName("SettingsGroupBox")
         
-        # This will be the overall layout for the content inside UI Customization group
-        # It will hold the left column (comboboxes) and the right column (preview gauge) horizontally
-        ui_custom_overall_layout = QHBoxLayout(ui_custom_group) 
-        ui_custom_overall_layout.setContentsMargins(10, 20, 10, 10)
-        ui_custom_overall_layout.setSpacing(10)
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        main_layout.addWidget(scroll_area)
 
-        # Left Column for Gauge Type/Style Comboboxes
-        left_column_layout = QVBoxLayout()
-        left_column_layout.setContentsMargins(0,0,0,0)
-        left_column_layout.setSpacing(10) # Spacing between the horizontal rows of labels/comboboxes
-
-        # Gauge Display Type Row (Label and ComboBox side-by-side)
-        gauge_type_h_layout = QHBoxLayout()
-        gauge_type_h_layout.addWidget(QLabel("Gauge Display Type:"))
-        self.gauge_type_combo = QComboBox()
-        self.gauge_type_combo.setObjectName("SettingsComboBox")
-        self.gauge_type_combo.addItems([
-            "Type 1 (Standard)", 
-            "Type 2 (Compact)", 
-            "Type 3 (Digital)", 
-            "Type 4 (Analog - Basic)",
-            "Type 5 (Analog - Full)",
-            "Type 6 (Progress Bar - Horizontal)",
-            "Type 7 (Progress Bar - Vertical)"
-        ])
-        self.gauge_type_combo.setFixedWidth(200) # Explicitly set fixed width
-        gauge_type_h_layout.addWidget(self.gauge_type_combo)
-        gauge_type_h_layout.addStretch(1) # Push to left, ensuring combobox respects fixed width
-        left_column_layout.addLayout(gauge_type_h_layout)
-
-        # Gauge Display Style Row (Label and ComboBox side-by-side)
-        gauge_style_h_layout = QHBoxLayout()
-        gauge_style_h_layout.addWidget(QLabel("Gauge Display Style:"))
-        self.gauge_style_combo = QComboBox()
-        self.gauge_style_combo.setObjectName("SettingsComboBox")
-        self.gauge_style_combo.addItems([
-            "Default Style",
-            "Style 1 (Modern)",
-            "Style 2 (Classic)",
-            "Style 3 (Minimal)",
-            "Style 4 (Flat)",
-            "Style 5 (Heavy Border)",
-            "Style 6 (Gradient Fill)",
-            "Style 7 (Subtle Glow)",
-            "Style 8 (Shadowed)",
-            "Style 9 (3D Effect)",
-            "Style 10 (Raised)",
-            "Style 11 (Sunken)",
-            "Style 12 (Rounded)",
-            "Style 13 (Bold Outline)"
-        ])
-        self.gauge_style_combo.setFixedWidth(200) # Explicitly set fixed width
-        gauge_style_h_layout.addWidget(self.gauge_style_combo)
-        gauge_style_h_layout.addStretch(1) # Push to left, ensuring combobox respects fixed width
-        left_column_layout.addLayout(gauge_style_h_layout)
-
-        left_column_layout.addStretch(1) # Push content to top left within its column
-
-        ui_custom_overall_layout.addLayout(left_column_layout) # Add the left column to the overall horizontal layout
-
-        # Right side: Preview Gauge (Moved to the right column)
-        preview_gauge_group = QGroupBox("Gauge Preview")
-        preview_gauge_group.setObjectName("PreviewGaugeGroupBox")
-        preview_gauge_layout = QVBoxLayout(preview_gauge_group)
-        # Pass a mock dict for thresholds for preview purposes
-        # These will be updated later by update_preview_gauge_thresholds using real data.
-        mock_thresholds = {'low': 20.0, 'high': 30.0} 
-        self.preview_gauge = SensorDisplayWidget(
-            title="Temperature Preview",
-            unit="\u00b0C", # Changed from "°C" to "degC"
-            thresholds=mock_thresholds, # Pass mock thresholds
-            metric_type="temperature",
-            sensor_category="HTU21D",
-            main_window=self.main_window,
-            theme_colors=self.theme_colors,
-            initial_gauge_type=self.initial_gauge_type, # Use the initial values from __init__
-            initial_gauge_style=self.initial_gauge_style, # Use the initial values from __init__
-            is_preview=True, # Set is_preview to True
-            parent=preview_gauge_group
-        )
-        # Initially set a value for the preview gauge - this will be overwritten later by update_preview_gauge
-        self.preview_gauge.update_value(25.5) 
-        preview_gauge_layout.addWidget(self.preview_gauge)
+        content_widget = QWidget()
+        scroll_area.setWidget(content_widget)
         
-        ui_custom_overall_layout.addWidget(preview_gauge_group) # Add the preview gauge group to the overall horizontal layout
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setContentsMargins(10, 10, 10, 10)
+        content_layout.setSpacing(15)
+        content_layout.setAlignment(Qt.AlignTop)
 
-        main_layout.addWidget(ui_custom_group) # Add the UI Customization group to the main tab layout
+        content_widget.setProperty("class", "tab-page") 
 
-        # --- Threshold Settings Group ---
-        threshold_group = QGroupBox("Alert Thresholds")
-        threshold_group.setObjectName("SettingsGroupBox")
-        self.threshold_layout = QFormLayout(threshold_group)
-        self.threshold_layout.setContentsMargins(10, 20, 10, 10)
-        self.threshold_layout.setSpacing(10)
+        general_settings_group = QGroupBox("General Settings")
+        general_settings_group.setObjectName("GeneralSettingsGroup")
+        general_form_layout = QFormLayout(general_settings_group)
+        self.populate_general_settings_section(general_form_layout)
+        content_layout.addWidget(general_settings_group)
+
+        sensor_config_group = QGroupBox("Sensor Presence & Precision")
+        sensor_config_group.setObjectName("SensorConfigGroup")
+        self.sensor_config_layout = QVBoxLayout(sensor_config_group)
+        self.sensor_config_layout.setContentsMargins(10, 20, 10, 10) 
+        self.sensor_config_layout.setSpacing(10) 
+        content_layout.addWidget(sensor_config_group)
         
-        # This will be populated dynamically based on available sensors/metrics
-        self.threshold_inputs = {} # Store references to QLineEdit widgets {metric_key: {'low': QLineEdit, 'high': QLineEdit}}
-        self.populate_threshold_inputs() # Call method to create inputs
+        self.sensor_ranges_group = QGroupBox("Sensor Display Ranges")
+        self.sensor_ranges_group.setObjectName("SensorRangesGroup")
+        self.sensor_ranges_layout = QVBoxLayout(self.sensor_ranges_group)
+        self.sensor_ranges_layout.setContentsMargins(10, 20, 10, 10)
+        self.sensor_ranges_layout.setSpacing(5)
+        content_layout.addWidget(self.sensor_ranges_group)
 
-        main_layout.addWidget(threshold_group)
+        thresholds_group = QGroupBox("Alert Thresholds")
+        thresholds_group.setObjectName("ThresholdsGroup")
+        self.thresholds_layout = QVBoxLayout(thresholds_group)
+        self.thresholds_layout.setContentsMargins(10, 20, 10, 10)
+        self.thresholds_layout.setSpacing(5)
+        content_layout.addWidget(thresholds_group)
+
+        self.populate_all_sensor_sections() 
         
-        # --- Data Logging Settings Group ---
-        data_logging_group = QGroupBox("Data Logging Settings")
-        data_logging_group.setObjectName("SettingsGroupBox")
-        data_logging_layout = QFormLayout(data_logging_group)
-        data_logging_layout.setContentsMargins(10, 20, 10, 10)
-        data_logging_layout.setSpacing(10)
-
-        self.data_log_enabled_checkbox = QCheckBox("Enable Data Logging to CSV")
-        self.data_log_enabled_checkbox.setObjectName("SettingsCheckBox")
-        data_logging_layout.addRow(self.data_log_enabled_checkbox)
-
-        self.data_log_max_size_input = QLineEdit()
-        self.data_log_max_size_input.setObjectName("SettingsLineEdit")
-        self.data_log_max_size_input.setPlaceholderText("e.g., 10 (MB)")
-        data_logging_layout.addRow(QLabel("Max Log File Size (MB):"), self.data_log_max_size_input)
-
-        self.data_log_max_rotations_input = QLineEdit()
-        self.data_log_max_rotations_input.setObjectName("SettingsLineEdit")
-        self.data_log_max_rotations_input.setPlaceholderText("e.g., 5 (files)")
-        data_logging_layout.addRow(QLabel("Max Daily Rotated Files:"), self.data_log_max_rotations_input)
-
-        main_layout.addWidget(data_logging_group)
-
-        main_layout.addStretch(1) # Push all groups to the top
-
-    def populate_themes(self):
-        """Populates the theme combo box with available QSS files."""
-        self.current_theme_combo.clear()
-        themes = self.settings_manager.get_available_themes()
-        self.current_theme_combo.addItems(themes)
+        button_bar_widget = QWidget()
+        button_bar_widget.setObjectName("ButtonBar")
+        button_layout = QHBoxLayout(button_bar_widget)
+        button_layout.setContentsMargins(0, 10, 0, 0)
+        button_layout.addStretch(1)
         
-        # Set current theme selection
-        current_theme_file = self.settings_manager.get_setting('General', 'current_theme', type=str)
-        index = self.current_theme_combo.findText(current_theme_file, Qt.MatchExactly)
-        if index != -1:
-            self.current_theme_combo.setCurrentIndex(index)
-        else:
-            logger.warning(f"SettingsTab: Current theme '{current_theme_file}' not found in available themes. Defaulting to first item.")
-            if self.current_theme_combo.count() > 0:
-                self.current_theme_combo.setCurrentIndex(0)
+        self.apply_button = QPushButton("Apply All Settings")
+        self.apply_button.setObjectName("SettingsApplyButton")
+        button_layout.addWidget(self.apply_button)
+        content_layout.addWidget(button_bar_widget)
+        
+        content_layout.addStretch(1) 
 
-    def populate_threshold_inputs(self):
-        """
-        Dynamically creates QLineEdit widgets for threshold settings
-        based on configured sensors and metrics.
-        """
-        # Clear existing inputs
-        for i in reversed(range(self.threshold_layout.count())): 
-            widget_item = self.threshold_layout.itemAt(i)
-            if widget_item:
-                widget = widget_item.widget()
-                if widget:
-                    self.threshold_layout.removeWidget(widget)
-                    widget.deleteLater() # Safely delete widget
-                else: # Could be a layout within the form layout
-                    layout = widget_item.layout()
-                    if layout:
-                        # Recursively clear layout items
-                        for j in reversed(range(layout.count())):
-                            item = layout.itemAt(j)
-                            if item:
-                                if item.widget():
-                                    item.widget().deleteLater()
-                                elif item.layout():
-                                    self._clear_layout(item.layout())
-                                layout.removeItem(item)
-                        self.threshold_layout.removeItem(widget_item)
-                        layout.deleteLater()
-            
-        self.threshold_inputs = {} # Reset dictionary
+    def populate_general_settings_section(self, layout):
+        self.mock_mode_checkbox = QCheckBox("Enable Mock Data Mode")
+        layout.addRow(self.mock_mode_checkbox)
 
-        configured_sensors = self.main_window.settings_manager.get_sensor_configs()
-        # Ensure consistent order (same as dashboard/details tab)
-        display_order = ['HTU21D', 'BMP180', 'BH1750'] 
+        self.sampling_rate_edit = QLineEdit()
+        self.sampling_rate_edit.setValidator(QIntValidator()) 
+        layout.addRow("Sensor Sampling Rate (ms):", self.sampling_rate_edit)
 
-        for sensor_type in display_order:
-            if sensor_type in configured_sensors:
-                for metric_type in configured_sensors[sensor_type]:
-                    metric_key = f"{sensor_type}_{metric_type}"
-                    # This unit is for the label only, not for data storage.
-                    # It still needs to be ASCII-safe if the issue persists in string literals.
-                    unit = self.main_window.settings_manager.get_unit_for_metric(sensor_type, metric_type)
-
-                    label_text = f"{sensor_type} {metric_type.capitalize()} ({unit}):"
-                    label = QLabel(label_text)
-                    label.setObjectName("ThresholdLabel")
-
-                    low_input = QLineEdit()
-                    low_input.setPlaceholderText("Low")
-                    low_input.setObjectName(f"ThresholdInput_{metric_key}_low")
-                    # Use the validator from main_window
-                    if hasattr(self.main_window, 'float_validator'): # Check if validator exists
-                        low_input.setValidator(self.main_window.float_validator) 
-                    else:
-                        logger.warning("SettingsTab: float_validator not found on main_window during populate_threshold_inputs.")
-                    
-                    high_input = QLineEdit()
-                    high_input.setPlaceholderText("High")
-                    high_input.setObjectName(f"ThresholdInput_{metric_key}_high")
-                    # Use the validator from main_window
-                    if hasattr(self.main_window, 'float_validator'): # Check if validator exists
-                        high_input.setValidator(self.main_window.float_validator) 
-                    else:
-                        logger.warning("SettingsTab: float_validator not found on main_window during populate_threshold_inputs.")
-
-                    # Store references
-                    self.threshold_inputs[metric_key] = {'low': low_input, 'high': high_input}
-
-                    # Add to form layout
-                    h_layout = QHBoxLayout()
-                    h_layout.addWidget(low_input)
-                    h_layout.addWidget(high_input)
-                    self.threshold_layout.addRow(label, h_layout)
-                    
-                    logger.debug(f"SettingsTab: Created threshold inputs for {metric_key}.")
+        self.data_store_max_points_edit = QLineEdit()
+        self.data_store_max_points_edit.setValidator(QIntValidator()) 
+        layout.addRow("Data Store Max Points:", self.data_store_max_points_edit)
+        
+        self.alert_sound_checkbox = QCheckBox("Enable Alert Sound")
+        layout.addRow(self.alert_sound_checkbox)
+        
+        self.data_log_enabled_checkbox = QCheckBox("Enable Sensor Data Logging to File")
+        layout.addRow(self.data_log_enabled_checkbox)
 
     def _clear_layout(self, layout):
-        """Recursively clears all widgets and layouts from a layout."""
         if layout is not None:
             while layout.count():
                 item = layout.takeAt(0)
-                if item.widget() is not None:
-                    item.widget().deleteLater()
+                widget = item.widget()
+                if widget:
+                    widget.setParent(None)
+                    widget.deleteLater()
                 elif item.layout() is not None:
                     self._clear_layout(item.layout())
-                # Only remove if it was successfully taken
-                if item:
-                    layout.removeItem(item)
 
-    def load_settings_to_ui(self):
-        """Loads current settings from SettingsManager and populates UI widgets."""
-        logger.info("SettingsTab: Loading settings to UI.")
-        self.mock_mode_checkbox.setChecked(self.settings_manager.get_setting('General', 'mock_mode', type=bool))
-        self.sampling_rate_input.setText(str(self.settings_manager.get_setting('General', 'sampling_rate_ms', type=int)))
-        self.alert_sound_checkbox.setChecked(self.settings_manager.get_setting('General', 'alert_sound_enabled', type=bool))
+    def populate_all_sensor_sections(self):
+        logger.debug("SettingsTab: Populating all sensor sections.")
+        self.populate_sensor_config_section()
+        self.populate_sensor_ranges_section()
+        self.populate_threshold_section()
+        self.load_settings() 
 
-        # Set theme combo box
-        current_theme_file = self.settings_manager.get_setting('General', 'current_theme', type=str)
-        index = self.current_theme_combo.findText(current_theme_file, Qt.MatchExactly)
-        if index != -1:
-            self.current_theme_combo.setCurrentIndex(index)
+    def populate_sensor_config_section(self):
+        logger.debug("SettingsTab: Populating sensor config section.")
+        self._clear_layout(self.sensor_config_layout)
+        self.sensor_config_widgets.clear()
+        self.precision_line_edits.clear()
 
-        # Set gauge type and style combo boxes
-        current_gauge_type = self.settings_manager.get_setting('General', 'current_gauge_type', type=str)
-        index_type = self.gauge_type_combo.findText(current_gauge_type, Qt.MatchExactly)
-        if index_type != -1:
-            self.gauge_type_combo.setCurrentIndex(index_type)
+        all_sensor_metric_configs = self.settings_manager.get_all_metric_info()
 
-        current_gauge_style = self.settings_manager.get_setting('General', 'current_gauge_style', type=str)
-        index_style = self.gauge_style_combo.findText(current_gauge_style, Qt.MatchExactly)
-        if index_style != -1:
-            self.gauge_style_combo.setCurrentIndex(index_style)
+        if not all_sensor_metric_configs:
+            self.sensor_config_layout.addWidget(QLabel("No sensors configured."))
+            return
 
-        # Load data logging settings
-        self.data_log_enabled_checkbox.setChecked(self.settings_manager.get_setting('General', 'data_log_enabled', type=bool))
-        self.data_log_max_size_input.setText(str(self.settings_manager.get_setting('General', 'data_log_max_size_mb', type=float)))
-        self.data_log_max_rotations_input.setText(str(self.settings_manager.get_setting('General', 'data_log_max_rotations', type=int)))
-
-
-        self.update_threshold_display() # Load thresholds into their respective input fields
-        self.update_preview_gauge() # Update preview gauge with current UI settings
-        logger.debug("SettingsTab: UI populated with settings.")
-
-
-    def update_threshold_display(self):
-        """
-        Loads the current thresholds from SettingsManager and updates the QLineEdit widgets.
-        This is called on tab change and after initial load.
-        """
-        all_thresholds = self.settings_manager.get_all_thresholds()
-        logger.debug(f"SettingsTab: Updating threshold display with: {all_thresholds}")
-
-        for metric_key, inputs in self.threshold_inputs.items():
-            parts = metric_key.split('_')
-            sensor_type = parts[0].lower() # Convert to lowercase for lookup
-            metric_type = '_'.join(parts[1:]).lower() # Convert to lowercase for lookup (handles multi-word metrics)
+        for sensor_type, metrics in sorted(all_sensor_metric_configs.items()):
+            sensor_group_box = QGroupBox(f"{sensor_type} Configuration")
+            self.sensor_config_layout.addWidget(sensor_group_box)
             
-            # Access the nested dictionary using the lowercase keys
-            metric_thresholds = all_thresholds.get(sensor_type, {}).get(metric_type, {})
-            
-            low_thr = metric_thresholds.get('low')
-            high_thr = metric_thresholds.get('high')
+            group_layout = QFormLayout() 
+            sensor_group_box.setLayout(group_layout)
 
-            if low_thr is not None:
-                inputs['low'].setText(f"{low_thr:.1f}") # Format for display
-            else:
-                inputs['low'].clear()
-            
-            if high_thr is not None:
-                inputs['high'].setText(f"{high_thr:.1f}") # Format for display
-            else:
-                inputs['high'].clear()
-            logger.debug(f"SettingsTab: Displayed thresholds for {metric_key}: Low={inputs['low'].text()}, High={inputs['high'].text()}.")
+            sensor_present_key = f"{sensor_type.lower()}_present"
+            sensor_checkbox = QCheckBox(f"Enable {sensor_type} Sensor")
+            sensor_checkbox.setObjectName(f"SensorPresentCheckbox_{SettingsManager._format_name_for_qss(sensor_type)}")
+            sensor_checkbox.stateChanged.connect(partial(self._on_sensor_presence_changed, sensor_type))
+            group_layout.addRow(sensor_checkbox) 
+            self.sensor_config_widgets[sensor_present_key] = sensor_checkbox 
+
+            for metric_type in sorted(metrics.keys()):
+                h_layout = QHBoxLayout()
+                
+                metric_present_key = f"{sensor_type.lower()}_{metric_type.lower()}_present"
+                metric_checkbox = QCheckBox(f"Enable {metric_type.capitalize()}")
+                metric_checkbox.setObjectName(f"MetricPresentCheckbox_{SettingsManager._format_name_for_qss(sensor_type)}_{SettingsManager._format_name_for_qss(metric_type)}")
+                metric_checkbox.stateChanged.connect(partial(self._on_metric_presence_changed, sensor_type, metric_type))
+                h_layout.addWidget(metric_checkbox)
+                self.sensor_config_widgets[metric_present_key] = metric_checkbox 
+
+                h_layout.addStretch(1)
+
+                precision_edit = QLineEdit()
+                precision_edit.setValidator(QIntValidator())
+                precision_edit.setFixedWidth(50)
+                precision_edit.editingFinished.connect(partial(self._on_precision_changed, sensor_type, metric_type, precision_edit))
+                self.precision_line_edits[(sensor_type, metric_type)] = precision_edit 
+                
+                h_layout.addWidget(precision_edit)
+                h_layout.addWidget(QLabel("decimals"))
+                
+                group_layout.addRow(f"  — {metric_type.capitalize()}:", h_layout) 
+
+    def populate_sensor_ranges_section(self):
+        logger.debug("SettingsTab: Populating sensor ranges section.")
+        self._clear_layout(self.sensor_ranges_layout)
+        self.range_inputs.clear()
+
+        sensor_configs = self.settings_manager.get_all_metric_info()
+        for sensor_type, metrics in sorted(sensor_configs.items()):
+            for metric_type in sorted(metrics.keys()):
+                row_layout = QHBoxLayout()
+                row_layout.setSpacing(10)
+                
+                label = QLabel(f"{sensor_type} {metric_type.capitalize()}:")
+                row_layout.addWidget(label, 2)
+
+                min_input = QLineEdit()
+                min_input.setValidator(QDoubleValidator())
+                min_key = f"{sensor_type.lower()}_{metric_type.lower()}_min"
+                min_input.setObjectName(min_key) 
+                self.range_inputs[min_key] = min_input
+                
+                max_input = QLineEdit()
+                max_input.setValidator(QDoubleValidator())
+                max_key = f"{sensor_type.lower()}_{metric_type.lower()}_max"
+                max_input.setObjectName(max_key) 
+                self.range_inputs[max_key] = max_input
+
+                row_layout.addWidget(QLabel("Min:"))
+                row_layout.addWidget(min_input, 1)
+                row_layout.addWidget(QLabel("Max:"))
+                row_layout.addWidget(max_input, 1)
+                
+                self.sensor_ranges_layout.addLayout(row_layout)
+
+                min_input.editingFinished.connect(partial(self._on_range_changed, sensor_type, metric_type))
+                max_input.editingFinished.connect(partial(self._on_range_changed, sensor_type, metric_type))
+
+    def populate_threshold_section(self):
+        logger.debug("SettingsTab: Populating threshold section.")
+        self._clear_layout(self.thresholds_layout)
+        self.threshold_line_edits.clear()
+
+        sensor_configs = self.settings_manager.get_all_metric_info()
         
-        # Ensure preview gauge also has the latest thresholds applied
-        self.update_preview_gauge_thresholds()
+        if not sensor_configs:
+            no_thresholds_label = QLabel("No sensors configured to set thresholds for.")
+            self.thresholds_layout.addWidget(no_thresholds_label)
+            return
 
+        for sensor_type, metrics in sorted(sensor_configs.items()):
+            group_box = QGroupBox(f"{sensor_type} Thresholds")
+            group_layout = QFormLayout(group_box) 
+            
+            for metric_type in sorted(metrics.keys()):
+                h_layout = QHBoxLayout()
+                h_layout.setSpacing(5) 
+                
+                low_edit = QLineEdit()
+                low_edit.setValidator(QDoubleValidator())
+                low_edit.setFixedWidth(60) 
+                self.threshold_line_edits[(sensor_type, metric_type, 'warning_low_value')] = low_edit 
+                h_layout.addWidget(QLabel("Low:"))
+                h_layout.addWidget(low_edit)
 
-    def connect_signals(self):
-        """Connects UI widget signals to their respective handler methods."""
-        logger.debug("SettingsTab: Connecting signals.")
-        self.mock_mode_checkbox.stateChanged.connect(lambda state: self.settings_manager.set_setting('General', 'mock_mode', state == Qt.Checked))
-        self.sampling_rate_input.editingFinished.connect(self._save_sampling_rate)
-        self.alert_sound_checkbox.stateChanged.connect(lambda state: self.settings_manager.set_setting('General', 'alert_sound_enabled', state == Qt.Checked))
-        self.current_theme_combo.currentIndexChanged.connect(self._save_current_theme)
+                high_edit = QLineEdit()
+                high_edit.setValidator(QDoubleValidator())
+                high_edit.setFixedWidth(60) 
+                self.threshold_line_edits[(sensor_type, metric_type, 'warning_high_value')] = high_edit 
+                h_layout.addWidget(QLabel("High:"))
+                h_layout.addWidget(high_edit)
 
-        self.gauge_type_combo.currentIndexChanged.connect(self._save_gauge_settings)
-        self.gauge_style_combo.currentIndexChanged.connect(self._save_gauge_settings)
+                crit_low_edit = QLineEdit()
+                crit_low_edit.setValidator(QDoubleValidator())
+                crit_low_edit.setFixedWidth(60) 
+                self.threshold_line_edits[(sensor_type, metric_type, 'critical_low_value')] = crit_low_edit 
+                h_layout.addWidget(QLabel("Crit. Low:"))
+                h_layout.addWidget(crit_low_edit)
+
+                crit_high_edit = QLineEdit()
+                crit_high_edit.setValidator(QDoubleValidator())
+                crit_high_edit.setFixedWidth(60) 
+                self.threshold_line_edits[(sensor_type, metric_type, 'critical_high_value')] = crit_high_edit 
+                h_layout.addWidget(QLabel("Crit. High:"))
+                h_layout.addWidget(crit_high_edit)
+
+                h_layout.addStretch(1) 
+
+                group_layout.addRow(QLabel(f"{metric_type.capitalize()}:"), h_layout) 
+            
+            self.thresholds_layout.addWidget(group_box)
+
+    def setup_connections(self):
+        logger.debug("SettingsTab: Setting up connections.")
+        self.apply_button.clicked.connect(self.apply_settings)
+        self.mock_mode_checkbox.toggled.connect(self._on_mock_mode_changed)
+        self.sampling_rate_edit.editingFinished.connect(lambda: self._on_int_setting_changed('General', 'sampling_rate_ms', self.sampling_rate_edit))
+        self.alert_sound_checkbox.toggled.connect(self._on_alert_sound_changed)
+        self.data_log_enabled_checkbox.toggled.connect(self._on_data_log_enabled_changed)
+        self.data_store_max_points_edit.editingFinished.connect(lambda: self._on_int_setting_changed('General', 'data_store_max_points', self.data_store_max_points_edit))
         
-        # Connect threshold input fields to save method
-        for metric_key, inputs in self.threshold_inputs.items():
-            inputs['low'].editingFinished.connect(lambda mk=metric_key: self._save_threshold(mk, 'low'))
-            inputs['high'].editingFinished.connect(lambda mk=metric_key: self._save_threshold(mk, 'high'))
+        # This connection is fine, it connects to the method defined below.
+        self.settings_manager.settings_updated.connect(self._on_settings_updated) 
 
-        # Connect data logging inputs
-        self.data_log_enabled_checkbox.stateChanged.connect(lambda state: self.settings_manager.set_setting('General', 'data_log_enabled', state == Qt.Checked))
-        self.data_log_max_size_input.editingFinished.connect(self._save_data_log_max_size)
-        self.data_log_max_rotations_input.editingFinished.connect(self._save_data_log_max_rotations)
+        # Connect range inputs
+        for key, line_edit in self.range_inputs.items():
+            parts = key.split('_')
+            sensor_type = parts[0].upper()
+            metric_type = parts[1].lower()
+            line_edit.editingFinished.connect(partial(self._on_range_changed, sensor_type, metric_type))
 
-        logger.debug("SettingsTab: Signals connected.")
-
-
-    def _save_sampling_rate(self):
-        """Saves the sampling rate setting."""
-        try:
-            rate_ms = int(self.sampling_rate_input.text())
-            if rate_ms <= 0:
-                raise ValueError("Sampling rate must be a positive integer.")
-            self.settings_manager.set_setting('General', 'sampling_rate_ms', rate_ms)
-            logger.debug(f"SettingsTab: Saved sampling rate: {rate_ms} ms.")
-        except ValueError as e:
-            self.sampling_rate_input.setText(str(self.settings_manager.get_setting('General', 'sampling_rate_ms', type=int))) # Revert to last valid
-            self.main_window.show_status_message(f"Invalid sampling rate: {e}. Please enter a positive integer.", "error")
-            logger.error(f"SettingsTab: Invalid sampling rate input: {self.sampling_rate_input.text()}. Error: {e}")
-
-    def _save_current_theme(self):
-        """Saves the selected theme and triggers theme change."""
-        selected_theme = self.current_theme_combo.currentText()
-        self.settings_manager.set_theme(selected_theme) # SettingsManager will handle reload and signal
-        logger.debug(f"SettingsTab: Saved current theme: {selected_theme}.")
-        # No need to manually emit theme_changed here, SettingsManager already does it.
-        # AnaviSensorUI's theme_changed slot is connected to SettingsManager's theme_changed_signal
-
-    def _save_gauge_settings(self):
-        """Saves the selected gauge type and style, and propagates the change."""
-        selected_type = self.gauge_type_combo.currentText()
-        selected_style = self.gauge_style_combo.currentText()
-        # Set gauge type and style in settings manager
-        self.settings_manager.set_setting('General', 'current_gauge_type', selected_type)
-        self.settings_manager.set_setting('General', 'current_gauge_style', selected_style)
-        logger.debug(f"SettingsTab: Saved gauge settings: Type='{selected_type}', Style='{selected_style}'.")
+    def load_settings(self):
+        """Loads all current settings from the manager and populates the UI fields."""
+        logger.debug("SettingsTab.load_settings: Loading settings into UI.")
         
-        # Propagate this change to AnaviSensorUI which then tells other tabs
-        self.ui_customization_changed.emit(selected_type, selected_style)
-        self.update_preview_gauge() # Update the preview gauge immediately
-        logger.debug("SettingsTab: Emitted ui_customization_changed signal and updated preview gauge.")
-
-
-    def _save_threshold(self, metric_key, limit_type):
-        """
-        Saves an individual threshold value.
-        :param metric_key: e.g., 'HTU21D_temperature'
-        :param limit_type: 'low' or 'high'
-        """
-        input_widget = self.threshold_inputs[metric_key][limit_type]
-        full_config_key = f"{metric_key}_{limit_type}"
+        self.mock_mode_checkbox.setChecked(self.settings_manager.get_boolean_setting('General', 'mock_mode', fallback=False))
+        self.sampling_rate_edit.setText(str(self.settings_manager.get_int_setting('General', 'sampling_rate_ms', fallback=3000)))
+        self.data_store_max_points_edit.setText(str(self.settings_manager.get_int_setting('General', 'data_store_max_points', fallback=1000)))
+        self.alert_sound_checkbox.setChecked(self.settings_manager.get_boolean_setting('General', 'alert_sound_enabled', fallback=True))
+        self.data_log_enabled_checkbox.setChecked(self.settings_manager.get_boolean_setting('General', 'data_log_enabled', fallback=False))
         
-        try:
-            value_str = input_widget.text().strip()
-            if not value_str: # Allow clearing threshold by leaving empty
-                actual_value = None
-            else:
-                actual_value = float(value_str)
+        for key, checkbox in self.sensor_config_widgets.items():
+            if isinstance(key, str): 
+                config_key = key 
+            else: 
+                config_key = f"{key[0].lower()}_{key[1].lower()}_present"
             
-            # Retrieve existing thresholds to create the full updated dictionary
-            current_all_thresholds = self.settings_manager.get_all_thresholds()
-            
-            parts = metric_key.split('_')
-            sensor_type_orig_case = parts[0] # Keep original case for saving to config.ini
-            sensor_type_lower = parts[0].lower() # Lowercase for dictionary lookup
-            metric_type_lower = '_'.join(parts[1:]).lower() # Lowercase for dictionary lookup
-            
-            # Ensure the structure exists using lowercase keys for the dictionary
-            if sensor_type_lower not in current_all_thresholds:
-                current_all_thresholds[sensor_type_lower] = {}
-            if metric_type_lower not in current_all_thresholds[sensor_type_lower]:
-                current_all_thresholds[sensor_type_lower][metric_type_lower] = {}
-            
-            current_all_thresholds[sensor_type_lower][metric_type_lower][limit_type] = actual_value
+            is_checked = self.settings_manager.get_boolean_setting('Sensor_Presence', config_key, fallback=True)
+            checkbox.setChecked(is_checked)
+            logger.debug(f"SettingsTab.load_settings: Loaded sensor presence for {key}: {is_checked}")
 
-            # Save the individual setting to config.ini. Use the original casing for the key.
-            # config.ini keys are HTU21D_temperature_low, not htu21d_temperature_low
-            self.settings_manager.set_setting('Thresholds', full_config_key, str(actual_value) if actual_value is not None else '')
-            logger.debug(f"SettingsTab: Saved threshold [{full_config_key}] = {actual_value}.")
-            
-            # Emit the full updated thresholds dictionary
-            self.thresholds_updated.emit(current_all_thresholds)
-            logger.debug("SettingsTab: Emitted thresholds_updated signal with full thresholds.")
-            
-            # Update the preview gauge with the newly saved thresholds
-            self.update_preview_gauge_thresholds()
+        for key_tuple, line_edit in self.precision_line_edits.items():
+            precision_value = self.settings_manager.get_precision(key_tuple[0], key_tuple[1])
+            line_edit.setText(str(precision_value))
+            logger.debug(f"SettingsTab.load_settings: Loaded precision for {key_tuple}: {precision_value}")
 
-        except ValueError as e:
-            self.main_window.show_status_message(f"Invalid threshold for {metric_key} {limit_type}: {e}. Please enter a number or leave empty.", "error")
-            logger.error(f"SettingsTab: Invalid threshold input for {full_config_key}: '{input_widget.text()}'. Error: {e}")
-            # Revert input field to last valid saved value
-            current_value = self.settings_manager.get_setting('Thresholds', full_config_key, type=float, default=None)
-            input_widget.setText(f"{current_value:.1f}" if current_value is not None else "")
-
-    def update_preview_gauge(self):
-        """Updates the preview gauge based on current UI customization settings."""
-        if self.preview_gauge:
-            current_type = self.gauge_type_combo.currentText()
-            current_style = self.gauge_style_combo.currentText()
+        for key_str, input_widget in self.range_inputs.items():
+            parts = key_str.split('_')
+            sensor_type = parts[0].upper()
+            metric_type = parts[1].lower()
+            range_type = parts[2].lower() 
             
-            self.preview_gauge.update_theme_colors(self.theme_colors) # Ensure correct theme colors are used
-            self.preview_gauge.update_gauge_display_type_and_style(current_type, current_style)
+            value = self.settings_manager.get_float_setting('Sensor_Ranges', key_str, None) 
             
-            preview_value = 25.0 # Default mock value
+            input_widget.setText(str(value) if value is not None else "")
+            logger.debug(f"SettingsTab.load_settings: Loaded range for {sensor_type} {metric_type} ({range_type}): {value}")
 
-            # --- FIX: Check if data_store exists AND latest_data is not None ---
-            if hasattr(self.main_window, 'data_store') and self.main_window.data_store is not None:
-                latest_data = self.main_window.data_store.get_latest_data()
-                if latest_data is not None: # Check if get_latest_data actually returned data
-                    htu21d_temp_data = latest_data.get('HTU21D', {}).get('temperature', {})
-                    if 'value' in htu21d_temp_data:
-                        preview_value = htu21d_temp_data['value']
-                        logger.debug(f"SettingsTab: Using live data for preview gauge: {preview_value}")
+
+        for (sensor, metric, logical_th_name), line_edit in self.threshold_line_edits.items():
+            value = self.settings_manager.get_threshold(sensor, metric, logical_th_name)
+            line_edit.setText(str(value) if value is not None else "")
+            logger.debug(f"SettingsTab.load_settings: Loaded threshold for {sensor} {metric} {logical_th_name}: {value}")
+
+        logger.debug("SettingsTab.load_settings: Finished loading settings into UI.")
+
+    def apply_settings(self):
+        logger.info("SettingsTab: Applying all settings.")
+        # Apply General
+        self.settings_manager.set_setting('General', 'mock_mode', self.mock_mode_checkbox.isChecked())
+        self.settings_manager.set_setting('General', 'sampling_rate_ms', self.sampling_rate_edit.text())
+        self.settings_manager.set_setting('General', 'data_store_max_points', self.data_store_max_points_edit.text())
+        self.settings_manager.set_setting('General', 'alert_sound_enabled', self.alert_sound_checkbox.isChecked())
+        self.settings_manager.set_setting('General', 'data_log_enabled', self.data_log_enabled_checkbox.isChecked())
+        
+        # Apply Sensor Presence
+        for key, checkbox in self.sensor_config_widgets.items():
+            if isinstance(key, str): 
+                self.settings_manager.set_setting('Sensor_Presence', key, checkbox.isChecked())
+            else: 
+                config_key = f"{key[0].lower()}_{key[1].lower()}_present"
+                self.settings_manager.set_setting('Sensor_Presence', config_key, checkbox.isChecked())
+
+        # Apply Precision
+        for (sensor, metric), line_edit in self.precision_line_edits.items():
+            self.settings_manager.set_setting('Sensor_Precision', f"{sensor.lower()}_{metric.lower()}_precision", line_edit.text())
+            
+        # Apply Ranges
+        for key_str, line_edit in self.range_inputs.items():
+            self.settings_manager.set_setting('Sensor_Ranges', key_str, line_edit.text())
+
+        # Apply Thresholds
+        for (sensor, metric, logical_th_name), line_edit in self.threshold_line_edits.items():
+            self.settings_manager.set_threshold(sensor, metric, logical_th_name, line_edit.text())
+
+        self.settings_changed.emit() 
+        logger.info("All settings have been applied.")
+
+    @pyqtSlot(str, str, object)
+    def _on_settings_updated(self, section, key, value):
+        logger.debug(f"SettingsTab._on_settings_updated: Settings updated - Section: {section}, Key: '{key}', Value: {value}.")
+
+        if section in ['Sensor_Presence', 'Sensor_Precision', 'Sensor_Ranges']:
+            logger.debug(f"  Sensor configuration section '{section}' changed. Re-populating all sensor sections.")
+            self.populate_all_sensor_sections()
+            self.load_settings()
+        elif section == 'Thresholds':
+            logger.debug(f"  Thresholds section changed. Attempting to update specific threshold input.")
+            try:
+                parts = key.split('/')
+                if len(parts) == 3:
+                    sensor_type = parts[0]
+                    metric_type = parts[1]
+                    threshold_type_suffix = parts[2] 
+                    
+                    line_edit_key = (sensor_type, metric_type, threshold_type_suffix)
+                    if line_edit_key in self.threshold_line_edits:
+                        line_edit = self.threshold_line_edits[line_edit_key]
+                        latest_value = self.settings_manager.get_threshold(sensor_type, metric_type, threshold_type_suffix)
+                        line_edit.setText(str(latest_value) if latest_value is not None else "")
+                        logger.debug(f"    Updated UI for threshold {sensor_type}/{metric_type}/{threshold_type_suffix} to: {latest_value}")
                     else:
-                        logger.debug("SettingsTab: Live HTU21D temperature data not available within latest_data. Using mock value.")
+                        logger.warning(f"    Line edit not found for threshold key: {line_edit_key}. Repopulating all sensor sections.")
+                        self.populate_all_sensor_sections()
+                        self.load_settings()
                 else:
-                    logger.debug("SettingsTab: data_store.get_latest_data() returned None. Using mock value.")
-            else:
-                logger.debug("SettingsTab: data_store not available on main_window for preview. Using mock value.")
-
-            self.preview_gauge.update_value(preview_value)
-            logger.debug("SettingsTab: Preview gauge updated.")
-
-    def update_preview_gauge_thresholds(self):
-        """Updates the thresholds on the preview gauge."""
-        if self.preview_gauge:
-            # The preview gauge is hardcoded to show HTU21D Temperature
-            all_thresholds = self.settings_manager.get_all_thresholds()
-            # Ensure lowercase lookup for preview gauge thresholds
-            htu21d_temp_thresholds = all_thresholds.get('htu21d', {}).get('temperature', {})
-            self.preview_gauge.update_thresholds(htu21d_temp_thresholds)
-            logger.debug(f"SettingsTab: Preview gauge thresholds updated: {htu21d_temp_thresholds}")
-
-    def update_theme_colors(self, new_theme_colors):
-        """
-        Updates the theme colors for this tab and its contained widgets,
-        including the preview gauge.
-        """
-        logger.debug("SettingsTab: Updating theme colors and re-polishing.")
-        self.theme_colors.clear() # Clear old colors
-        self.theme_colors.update(new_theme_colors) # Update with new colors
-
-        # Re-polish the tab itself to apply QSS
+                    logger.warning(f"    Unexpected key format for Thresholds update: '{key}'. Re-populating all sensor sections.")
+                    self.populate_all_sensor_sections()
+                    self.load_settings()
+            except Exception as e:
+                logger.error(f"Error updating specific threshold UI for key '{key}': {e}", exc_info=True)
+                self.populate_all_sensor_sections()
+                self.load_settings()
+        
         self.style().polish(self)
-        for group_box in self.findChildren(QGroupBox):
-            group_box.style().polish(group_box)
-        for label in self.findChildren(QLabel):
-            label.style().polish(label)
-        for line_edit in self.findChildren(QLineEdit):
-            line_edit.style().polish(line_edit)
-        for combo_box in self.findChildren(QComboBox):
-            combo_box.style().polish(combo_box)
-        for check_box in self.findChildren(QCheckBox):
-            check_box.style().polish(check_box)
+        logger.debug("SettingsTab: Finished _on_settings_updated.")
 
-        # Propagate theme colors to the preview gauge
-        if self.preview_gauge:
-            self.preview_gauge.update_theme_colors(self.theme_colors)
+    @pyqtSlot(bool)
+    def _on_mock_mode_changed(self, checked):
+        logger.debug(f"SettingsTab: Mock mode changed to {checked}.")
+        self.settings_manager.set_setting('General', 'mock_mode', checked)
+        self.settings_changed.emit()
 
-        logger.debug("SettingsTab: Tab re-polished to apply new theme QSS.")
+    @pyqtSlot(bool)
+    def _on_alert_sound_changed(self, checked):
+        logger.debug(f"SettingsTab: Alert sound enabled changed to {checked}.")
+        self.settings_manager.set_setting('General', 'alert_sound_enabled', checked)
 
-    def _save_data_log_max_size(self):
-        """Saves the data log max size setting."""
-        try:
-            max_size_mb = float(self.data_log_max_size_input.text())
-            if max_size_mb <= 0:
-                raise ValueError("Max log file size must be a positive number.")
-            self.settings_manager.set_setting('General', 'data_log_max_size_mb', max_size_mb)
-            logger.debug(f"SettingsTab: Saved data log max size: {max_size_mb} MB.")
-        except ValueError as e:
-            self.data_log_max_size_input.setText(str(self.settings_manager.get_setting('General', 'data_log_max_size_mb', type=float))) # Revert
-            self.main_window.show_status_message(f"Invalid max log file size: {e}. Please enter a positive number.", "error")
-            logger.error(f"SettingsTab: Invalid data log max size input: {self.data_log_max_size_input.text()}. Error: {e}")
+    @pyqtSlot(bool)
+    def _on_data_log_enabled_changed(self, checked):
+        logger.debug(f"SettingsTab: Data logging enabled changed to {checked}.")
+        self.settings_manager.set_setting('General', 'data_log_enabled', checked)
 
-    def _save_data_log_max_rotations(self):
-        """Saves the data log max rotations setting."""
-        try:
-            max_rotations = int(self.data_log_max_rotations_input.text())
-            if max_rotations <= 0:
-                raise ValueError("Max daily rotated files must be a positive integer.")
-            self.settings_manager.set_setting('General', 'data_log_max_rotations', max_rotations)
-            logger.debug(f"SettingsTab: Saved data log max rotations: {max_rotations}.")
-        except ValueError as e:
-            self.data_log_max_rotations_input.setText(str(self.settings_manager.get_setting('General', 'data_log_max_rotations', type=int))) # Revert
-            self.main_window.show_status_message(f"Invalid max daily rotated files: {e}. Please enter a positive integer.", "error")
-            logger.error(f"SettingsTab: Invalid max daily rotated files: {self.data_log_max_rotations_input.text()}. Error: {e}")
+    @pyqtSlot(str, int)
+    def _on_sensor_presence_changed(self, sensor_type, state):
+        is_present = (state == Qt.Checked)
+        logger.debug(f"SettingsTab: Sensor presence for {sensor_type} changed to {is_present}.")
+        self.settings_manager.set_setting('Sensor_Presence', f"{sensor_type.lower()}_present", is_present)
+        self.settings_changed.emit()
 
+    @pyqtSlot(str, str, int)
+    def _on_metric_presence_changed(self, sensor_type, metric_type, state):
+        is_present = (state == Qt.Checked)
+        logger.debug(f"SettingsTab: Metric presence for {sensor_type} {metric_type} changed to {is_present}.")
+        self.settings_manager.set_setting('Sensor_Presence', f"{sensor_type.lower()}_{metric_type.lower()}_present", is_present)
+        self.settings_changed.emit()
+
+    @pyqtSlot(str, str, QLineEdit)
+    def _on_precision_changed(self, sensor_type, metric_type, line_edit):
+        logger.debug(f"SettingsTab: Precision for {sensor_type} {metric_type} changed to {line_edit.text()}.")
+        self.settings_manager.set_setting('Sensor_Precision', f"{sensor_type.lower()}_{metric_type.lower()}_precision", line_edit.text())
+        self.settings_changed.emit()
+
+    @pyqtSlot(str, str)
+    def _on_range_changed(self, sensor_type, metric_type):
+        logger.debug(f"SettingsTab: Range for {sensor_type} {metric_type} changed.")
+        min_key = f"{sensor_type.lower()}_{metric_type.lower()}_min"
+        max_key = f"{sensor_type.lower()}_{metric_type.lower()}_max"
+        min_input = self.range_inputs[min_key]
+        max_input = self.range_inputs[max_key]
+        
+        self.settings_manager.set_setting('Sensor_Ranges', min_key, min_input.text())
+        self.settings_manager.set_setting('Sensor_Ranges', max_key, max_input.text())
+        self.settings_changed.emit()
+
+    @pyqtSlot(str, str, str, QLineEdit)
+    def _on_threshold_changed(self, sensor_type, metric_type, threshold_type_suffix, line_edit):
+        logger.debug(f"SettingsTab: Threshold for {sensor_type} {metric_type} {threshold_type_suffix} changed to {line_edit.text()}.")
+        self.settings_manager.set_threshold(sensor_type, metric_type, threshold_type_suffix, line_edit.text())
+
+    @pyqtSlot(str, object, QLineEdit) 
+    def _on_int_setting_changed(self, section, key, line_edit):
+        logger.debug(f"SettingsTab: Int setting {section}/{key} changed to {line_edit.text()}.")
+        self.settings_manager.set_setting(section, key, line_edit.text())
+
+    @pyqtSlot(str, object, QLineEdit) 
+    def _on_float_setting_changed(self, section, key, line_edit):
+        logger.debug(f"SettingsTab: Float setting {section}/{key} changed to {line_edit.text()}.")
+        self.settings_manager.set_setting(section, key, line_edit.text())
+
+    def _clear_layout(self, layout):
+        """Removes all widgets from a layout."""
+        if layout is not None:
+            while layout.count():
+                item = layout.takeAt(0)
+                widget = item.widget()
+                if widget is not None:
+                    widget.setParent(None)
+                    widget.deleteLater()
+                elif item.layout() is not None:
+                    self._clear_layout(item.layout())
+
+    @pyqtSlot(dict)
+    def update_available_sensors(self, available_sensors_info):
+        """
+        Updates the UI based on newly discovered sensors.
+        """
+        logger.info("SettingsTab: Updating available sensors and repopulating UI sections.")
+        self.populate_all_sensor_sections()
+        self.load_settings()
+                
+    def update_theme_colors(self, new_theme_colors):
+        logger.info("SettingsTab: update_theme_colors called for SettingsTab. Re-polishing UI elements.")
+        self.theme_colors.clear()
+        self.theme_colors.update(new_theme_colors) 
+        
+        self.style().polish(self)
+        for child_widget in self.findChildren(QGroupBox):
+            self.style().polish(child_widget)
+        for child_widget in self.findChildren(QLabel):
+            self.style().polish(child_widget)
+        for child_widget in self.findChildren(QLineEdit):
+            self.style().polish(child_widget)
+        for child_widget in self.findChildren(QComboBox):
+            self.style().polish(child_widget)
+        for child_widget in self.findChildren(QCheckBox):
+            self.style().polish(child_widget)
+        for child_widget in self.findChildren(QPushButton):
+            self.style().polish(child_widget)
+        
+        logger.info("SettingsTab: Theme colors applied and UI polished.")

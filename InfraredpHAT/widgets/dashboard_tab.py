@@ -1,434 +1,587 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QComboBox, QSizePolicy
-from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QFont
+# widgets/dashboard_tab.py
+# -*- coding: utf-8 -*-
 import logging
-import re
-import datetime
+import math
+import collections
+from datetime import datetime
+from itertools import combinations as itertools_combinations
 
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QProgressBar, QSizePolicy, QSpacerItem, QScrollArea, QComboBox, QFormLayout
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal, pyqtSlot, QRect, QPoint, QRectF, QPointF, QSize
+
+from data_management.settings import SettingsManager
 from widgets.sensor_display import SensorDisplayWidget
 from widgets.matplotlib_widget import MatplotlibWidget
 
-logger = logging.getLogger(__name__) # Added explicit logger
+logger = logging.getLogger(__name__)
+
 
 class DashboardTab(QWidget):
     """
-    Dashboard tab displaying current sensor values with thresholds
-    and a customizable plot area.
+    Dashboard tab displaying an overview of all active sensor metrics
+    with dynamic gauges and a live plot.
     """
-    def __init__(self, data_store, thresholds, main_window, theme_colors, initial_gauge_type, initial_gauge_style, parent=None):
+    alert_triggered = pyqtSignal(str, str, str, str)
+    alert_cleared = pyqtSignal(str, str)
+
+    ui_customization_changed = pyqtSignal(str, str)
+    theme_changed = pyqtSignal(str)
+
+    def __init__(self, data_store, settings_manager,
+                 initial_dashboard_plot_time_range, initial_hide_matplotlib_toolbar, initial_plot_update_interval_ms,
+                 initial_gauge_type, initial_gauge_style,
+                 main_window=None,
+                 parent=None):
         super().__init__(parent)
-        self.setObjectName("DashboardTab") # Added object name for QSS
+        self.setObjectName("DashboardTab")
+
         self.data_store = data_store
-        # CRITICAL: This thresholds dictionary will be updated by AnaviSensorUI
-        # This is a reference to the global thresholds dictionary, which AnaviSensorUI manages.
-        self.thresholds = thresholds 
-        self.main_window = main_window # Store main_window reference
-        self.theme_colors = dict(theme_colors) if theme_colors is not None else {} # Store theme colors, defensive copy
-        
-        self.current_sensor_data = {} # Store last received data
+        self.settings_manager = settings_manager
+        self.theme_colors = self.settings_manager.get_theme_colors()
+        self.thresholds = self.settings_manager.get_thresholds()
+        self.main_window = main_window
 
-        self.initial_gauge_type = initial_gauge_type
-        self.initial_gauge_style = initial_gauge_style
+        self.sensor_widgets = {}
 
-        # Dictionary to store references to SensorDisplayWidget instances for easy iteration
-        self.sensor_display_widgets = {}
+        self.dashboard_plot_time_range = initial_dashboard_plot_time_range
+        self.hide_matplotlib_toolbar = initial_hide_matplotlib_toolbar
+        self.plot_update_interval_ms = initial_plot_update_interval_ms
+        self.gauge_type = initial_gauge_type
+        self.gauge_style = initial_gauge_style
 
-        # Initialize MatplotlibWidget here so it is available before setup_ui for theme updates
-        self.matplotlib_widget = MatplotlibWidget(parent=self, theme_colors=self.theme_colors) # Pass defensive copy of theme_colors
+        self.dashboard_plot_time_range_combo = None
+        # MODIFIED: Add sensor combo box and related variables
+        self.dashboard_plot_sensor_combo = None
+        self.dashboard_plot_metric_type_combo = None
+        self.current_selected_dashboard_plot_sensor = "All Sensors" # Default value
+        self.current_selected_dashboard_plot_metric_type = None
+        self.dashboard_plot_metric_display_to_actual_map = {}
 
-        self.setup_ui()
-        self.connect_signals()
+        self._setup_ui()
+
+        self.plot_update_timer = QTimer(self)
+        self.plot_update_timer.timeout.connect(self._on_plot_timer_timeout)
+        self.plot_update_timer.start(self.plot_update_interval_ms)
+
+        self._setup_connections()
+
         logger.info("DashboardTab initialized.")
 
-    def setup_ui(self):
-        """Initializes and arranges the UI elements for the dashboard tab."""
+    def _setup_ui(self):
+        """
+        Sets up the layout and initial widgets for the Dashboard tab.
+        """
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(10, 10, 10, 10) # Add some margins
-        main_layout.setSpacing(10) # Spacing between elements
+        main_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout.setSpacing(15)
+        main_layout.setAlignment(Qt.AlignTop)
 
-        # --- Top Controls Layout (Time Range and Metric Selection) ---
-        top_controls_layout = QHBoxLayout()
-        top_controls_layout.setContentsMargins(0, 0, 0, 10) # Bottom margin for separation
-        top_controls_layout.setSpacing(10)
+        self.content_widget = QGroupBox("Current Sensor Readings")
+        self.content_layout = QHBoxLayout(self.content_widget)
+        self.content_layout.setContentsMargins(10, 20, 10, 10)
+        self.content_layout.setSpacing(15)
+        self.content_layout.setAlignment(Qt.AlignLeft | Qt.AlignTop)
 
-        # Time Range Selection
-        time_range_label = QLabel("Plot Time Range:")
-        time_range_label.setObjectName("DashboardLabel") # For QSS
-        self.time_range_combo = QComboBox()
-        self.time_range_combo.setObjectName("DashboardComboBox") # For QSS
-        self.time_range_combo.addItems([
-            "Last 10 minutes", "Last 30 minutes", "Last 1 hour", 
-            "Last 3 hours", "Last 6 hours", "Last 12 hours", 
-            "Last 24 hours", "All Data"
-        ])
-        # Set default from settings or hardcoded if not found
-        default_time_range = self.main_window.settings_manager.get_setting('General', 'dashboard_plot_time_range', type=str, default="Last 30 minutes")
-        index = self.time_range_combo.findText(default_time_range)
-        if index != -1:
-            self.time_range_combo.setCurrentIndex(index)
+        main_layout.addWidget(self.content_widget)
+
+        plot_group_box = QGroupBox("Live Sensor Data Plot")
+        plot_group_box.setObjectName("PlotGroupBox")
+        plot_layout = QVBoxLayout(plot_group_box)
+
+        plot_options_row_layout = QHBoxLayout()
+        plot_options_row_layout.setAlignment(Qt.AlignLeft)
+        plot_options_row_layout.setSpacing(10)
+
+        plot_options_row_layout.addWidget(QLabel("Time Range:"))
+        self.dashboard_plot_time_range_combo = QComboBox()
+        self.dashboard_plot_time_range_combo.setObjectName("DashboardPlotTimeRangeCombo")
+        self.dashboard_plot_time_range_combo.addItems(self.data_store.get_available_time_ranges())
+        self.dashboard_plot_time_range_combo.setCurrentText(self.dashboard_plot_time_range)
+        plot_options_row_layout.addWidget(self.dashboard_plot_time_range_combo)
+
+        # MODIFIED: Add Sensor selection QComboBox
+        plot_options_row_layout.addWidget(QLabel("Sensor:"))
+        self.dashboard_plot_sensor_combo = QComboBox()
+        self.dashboard_plot_sensor_combo.setObjectName("DashboardPlotSensorCombo")
+        plot_options_row_layout.addWidget(self.dashboard_plot_sensor_combo)
+
+        plot_options_row_layout.addWidget(QLabel("Metric:"))
+        self.dashboard_plot_metric_type_combo = QComboBox()
+        self.dashboard_plot_metric_type_combo.setObjectName("DashboardPlotMetricTypeCombo")
+        plot_options_row_layout.addWidget(self.dashboard_plot_metric_type_combo)
+
+        plot_options_row_layout.addStretch(1)
+
+        plot_layout.addLayout(plot_options_row_layout)
+
+        self.plot_widget = MatplotlibWidget(
+            self.theme_colors,
+            self.settings_manager,
+            hide_toolbar=self.hide_matplotlib_toolbar
+        )
+        self.plot_widget.setObjectName("DashboardPlotWidget")
+        plot_layout.addWidget(self.plot_widget)
+
+        main_layout.addWidget(plot_group_box)
+
+        self.populate_sensor_display_widgets()
+        self.update_all_sensor_values()
+
+    def _setup_connections(self):
+        self.settings_manager.settings_updated.connect(self._on_settings_updated)
+        self.data_store.data_updated.connect(self.update_sensor_values)
+        self.dashboard_plot_time_range_combo.currentTextChanged.connect(self._on_plot_time_range_changed)
+        # MODIFIED: Connect the new sensor combo box
+        self.dashboard_plot_sensor_combo.currentTextChanged.connect(self._on_plot_sensor_changed)
+        self.dashboard_plot_metric_type_combo.currentTextChanged.connect(self._on_dashboard_plot_metric_type_changed)
+
+
+    def populate_sensor_display_widgets(self):
+        logger.info("DashboardTab: Populating sensor display widgets.")
         
-        top_controls_layout.addWidget(time_range_label)
-        top_controls_layout.addWidget(self.time_range_combo)
+        # Correctly clear the layout to prevent segmentation faults
+        while self.content_layout.count():
+            item = self.content_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.setParent(None)
+                widget.deleteLater()
 
-        # Single Sensor Metric Selection (now for all sensors combined)
-        sensor_metric_label = QLabel("Select Metric:")
-        sensor_metric_label.setObjectName("DashboardLabel") # For QSS
-        self.sensor_metric_combo = QComboBox()
-        self.sensor_metric_combo.setObjectName("DashboardComboBox") # For QSS
-        self._populate_sensor_metric_combo() # Populate based on available sensor configs
+        self.sensor_widgets.clear()
 
-        top_controls_layout.addWidget(sensor_metric_label)
-        top_controls_layout.addWidget(self.sensor_metric_combo)
-        
-        top_controls_layout.addStretch(1) # Pushes everything to the left
+        enabled_sensor_configs = self.settings_manager.get_sensor_configurations()
 
-        main_layout.addLayout(top_controls_layout)
+        if not enabled_sensor_configs:
+            no_sensors_label = QLabel("No sensors enabled in settings to show details.")
+            no_sensors_label.setAlignment(Qt.AlignCenter)
+            self.content_layout.addWidget(no_sensors_label)
+        else:
+            for sensor_type, metrics in enabled_sensor_configs.items():
+                for metric_type, metric_info in metrics.items():
+                    sensor_name = f"{sensor_type} {metric_type.capitalize()}"
 
-        # --- Sensor Display Widgets (Grid Layout) ---
-        self.sensor_display_group = QGroupBox("Current Sensor Readings")
-        self.sensor_display_group.setObjectName("DashboardGroupBox") # For QSS
-        self.sensor_display_layout = QHBoxLayout(self.sensor_display_group) # Use QHBoxLayout
-        self.sensor_display_layout.setContentsMargins(10, 20, 10, 10)
-        self.sensor_display_layout.setSpacing(15) # Spacing between individual sensor displays
-        self.sensor_display_layout.setAlignment(Qt.AlignLeft | Qt.AlignTop) # Align widgets to top-left
-
-        self._create_sensor_display_widgets() # Create instances of SensorDisplayWidget
-
-        main_layout.addWidget(self.sensor_display_group)
-
-        # --- Matplotlib Plot Area ---
-        plot_group = QGroupBox("Historical Data Plot")
-        plot_group.setObjectName("DashboardGroupBox") # For QSS
-        plot_layout = QVBoxLayout(plot_group)
-        plot_layout.setContentsMargins(10, 20, 10, 10)
-        plot_layout.setSpacing(5) # Smaller spacing for plot area
-
-        plot_layout.addWidget(self.matplotlib_widget) # Add the MatplotlibWidget instance
-
-        main_layout.addWidget(plot_group)
-
-        main_layout.setStretchFactor(self.sensor_display_group, 1) # Allow sensor displays to take reasonable space
-        main_layout.setStretchFactor(plot_group, 3) # Plot area takes more vertical space
-
-        self.setLayout(main_layout)
-
-
-    def _populate_sensor_metric_combo(self):
-        """
-        Populates the sensor_metric_combo with available sensor_type_metric_type combinations.
-        """
-        self.sensor_metric_combo.clear()
-        
-        configured_sensors = self.main_window.settings_manager.get_sensor_configs()
-        # Ensure consistent order
-        display_order = ['HTU21D', 'BMP180', 'BH1750'] 
-
-        items = []
-        for sensor_type in display_order:
-            if sensor_type in configured_sensors:
-                for metric_type in configured_sensors[sensor_type]:
-                    unit = self.main_window.settings_manager.get_unit_for_metric(sensor_type, metric_type)
-                    formatted_name = f"{sensor_type} {metric_type.capitalize()} ({unit})"
-                    # Store data as "sensor_type_metric_type" in the combo box for easy retrieval
-                    items.append((formatted_name, f"{sensor_type}_{metric_type}"))
-
-        # Sort items alphabetically by display name before adding
-        items.sort(key=lambda x: x[0])
-        
-        # Add a "All Metrics" option at the top
-        self.sensor_metric_combo.addItem("All Metrics", "all")
-        for display_name, data_value in items:
-            self.sensor_metric_combo.addItem(display_name, data_value)
-
-        logger.debug(f"DashboardTab: Sensor metric combo populated with {self.sensor_metric_combo.count()} items.")
-
-
-    def _create_sensor_display_widgets(self):
-        """
-        Creates and adds SensorDisplayWidget instances to the layout
-        based on configured sensors and metrics.
-        """
-        # Clear existing widgets from layout if any (important for re-creation)
-        for i in reversed(range(self.sensor_display_layout.count())): 
-            widget_item = self.sensor_display_layout.itemAt(i)
-            if widget_item:
-                widget = widget_item.widget()
-                if widget:
-                    self.sensor_display_layout.removeWidget(widget)
-                    widget.deleteLater()
-        self.sensor_display_widgets.clear() # Clear the dictionary of references
-
-        configured_sensors = self.main_window.settings_manager.get_sensor_configs()
-        display_order = ['HTU21D', 'BMP180', 'BH1750'] # Maintain consistent order for display
-
-        for sensor_type in display_order:
-            if sensor_type in configured_sensors:
-                for metric_type in configured_sensors[sensor_type]:
-                    # --- MODIFICATION: Changed title to only show metric type ---
-                    title = f"{metric_type.capitalize()}"
-                    unit = self.main_window.settings_manager.get_unit_for_metric(sensor_type, metric_type)
-                    
-                    # --- FIX: Ensure thresholds passed to SensorDisplayWidget are correctly cased and complete ---
-                    # Get the full thresholds dictionary from the settings manager (which has lowercase keys)
-                    all_thresholds_from_settings = self.main_window.settings_manager.get_all_thresholds()
-                    # Lookup with lowercase keys for consistency with how get_all_thresholds returns them
-                    metric_thresholds = all_thresholds_from_settings.get(sensor_type.lower(), {}).get(metric_type.lower(), {})
-                    
-                    display_widget = SensorDisplayWidget(
-                        title=title,
-                        unit=unit,
-                        thresholds=metric_thresholds, # Pass the specific metric's thresholds
+                    gauge = SensorDisplayWidget(
+                        sensor_name=sensor_name,
+                        sensor_category=sensor_type, 
                         metric_type=metric_type,
-                        sensor_category=sensor_type,
+                        gauge_type=self.settings_manager.get_gauge_type(sensor_type, metric_type),
+                        gauge_style=self.settings_manager.get_gauge_style(sensor_type, metric_type),
+                        min_value=metric_info.get('min', 0.0), 
+                        max_value=metric_info.get('max', 100.0),
+                        settings_manager=self.settings_manager,
+                        thresholds=self.settings_manager.get_thresholds().get(sensor_type, {}).get(metric_type, {}),
+                        initial_value=0.0, 
+                        unit=self.settings_manager.get_unit(sensor_type, metric_type),
+                        precision=self.settings_manager.get_precision(sensor_type, metric_type),
+                        parent=self.content_widget,
                         main_window=self.main_window,
-                        theme_colors=self.theme_colors, # Pass theme colors reference
-                        initial_gauge_type=self.initial_gauge_type, # Use initial gauge type from settings
-                        initial_gauge_style=self.initial_gauge_style, # Use initial gauge style from settings
-                        parent=self.sensor_display_group # Parent to the group box
+                        is_preview=False
                     )
-                    # Connect the alert_state_changed signal from each display widget to MainWindow
-                    display_widget.alert_state_changed.connect(self.main_window.on_sensor_alert_state_changed)
+              
+                    gauge.setObjectName(f"SensorDisplayWidget_{SettingsManager._format_name_for_qss(sensor_type)}_{SettingsManager._format_name_for_qss(metric_type)}")
+                    gauge.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+                    gauge.alert_triggered.connect(self.alert_triggered)
+                    gauge.alert_cleared.connect(self.alert_cleared)
+
+                    self.sensor_widgets[f"{sensor_type}_{metric_type}"] = gauge
                     
-                    # This setSizePolicy was already there from the previous modification.
-                    display_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+                    self.content_layout.addWidget(gauge)
+                    logger.debug(f"DashboardTab: Added gauge for {sensor_name}.")
+            
+        self._update_plot_combos()
 
-                    self.sensor_display_layout.addWidget(display_widget)
-                    self.sensor_display_widgets[f"{sensor_type}_{metric_type}"] = display_widget
-                    logger.debug(f"DashboardTab: Created SensorDisplayWidget for {sensor_type} {metric_type}.")
+    def _update_plot_combos(self):
+        """Populates the sensor and metric combo boxes for the plot."""
+        logger.debug("Updating plot combo boxes.")
+        self.dashboard_plot_sensor_combo.blockSignals(True)
+        self.dashboard_plot_sensor_combo.clear()
 
+        enabled_sensor_configs = self.settings_manager.get_sensor_configurations()
 
-    def connect_signals(self):
-        """Connects signals for the dashboard tab."""
-        self.time_range_combo.currentIndexChanged.connect(self.update_plot_data)
-        self.sensor_metric_combo.currentIndexChanged.connect(self.update_plot_data)
-        
-        # Connect to ensure the plot is resized correctly
-        self.matplotlib_widget.canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.matplotlib_widget.canvas.updateGeometry()
+        if not enabled_sensor_configs:
+            self.dashboard_plot_sensor_combo.addItem("No Sensors Available")
+            self.dashboard_plot_sensor_combo.setEnabled(False)
+            self.dashboard_plot_metric_type_combo.clear()
+            self.dashboard_plot_metric_type_combo.addItem("No Metrics Available")
+            self.dashboard_plot_metric_type_combo.setEnabled(False)
+            self.plot_widget.clear_plot("No enabled sensors to plot.")
+        else:
+            self.dashboard_plot_sensor_combo.setEnabled(True)
+            self.dashboard_plot_sensor_combo.addItem("All Sensors")
+            sensor_names = sorted(enabled_sensor_configs.keys())
+            self.dashboard_plot_sensor_combo.addItems(sensor_names)
 
-        logger.debug("DashboardTab: Signals connected.")
+            # Restore previous selection
+            last_selected_sensor = self.settings_manager.get_setting('UI', 'dashboard_plot_selected_sensor', fallback="All Sensors")
+            index = self.dashboard_plot_sensor_combo.findText(last_selected_sensor)
+            if index != -1:
+                self.dashboard_plot_sensor_combo.setCurrentIndex(index)
+            self.current_selected_dashboard_plot_sensor = self.dashboard_plot_sensor_combo.currentText()
 
-    def initialize_tab_data(self, theme_colors):
-        """
-        Initializes or refreshes all data displayed on this tab, including plot and gauges.
-        This is called by AnaviSensorUI after initial setup or when tab becomes visible.
-        :param theme_colors: The current theme colors dictionary.
-        """
-        logger.info("DashboardTab: Initializing all tab data.")
-        # --- FIX: Ensure the tab's internal theme_colors is updated here as well ---
-        self.theme_colors.update(theme_colors) # Ensure tab's own colors are fresh
-        # Propagate to plot and sensor display widgets
-        self.matplotlib_widget.theme_colors.update(self.theme_colors) # Pass the tab's (now updated) theme_colors
-        self.matplotlib_widget.apply_theme() # Correct method to apply theme
-        
-        # Renamed method below from update_sensor_display_widgets_with_latest_data to update_sensor_values
-        self.update_sensor_values(self.data_store.get_latest_data()) # Pass latest data to update values
-        self.update_plot_data() # Then update plot
-        
-        # --- FIX: Re-initialize and update theme colors for sensor display widgets here ---
-        # This loop is crucial to ensure all existing sensor display widgets get the updated theme colors
-        # after the tab's theme_colors are updated.
-        for display_widget in self.sensor_display_widgets.values():
-            display_widget.update_theme_colors(self.theme_colors) # Pass the tab's (now updated) theme_colors
-        
-        logger.info("DashboardTab: All tab data initialized.")
+        self.dashboard_plot_sensor_combo.blockSignals(False)
 
+        # Update metric combo based on the (newly updated) sensor combo
+        self._update_metric_combo()
 
-    def update_sensor_values(self, data):
-        """
-        Updates the individual sensor display widgets with new data.
-        This method is called by AnaviSensorUI and internally by initialize_tab_data.
-        """
-        self.current_sensor_data = data # Store the latest data
-        logger.debug(f"DashboardTab: update_sensor_values called. Raw data: {data}")
+    def _update_metric_combo(self):
+        """Populates the metric combo box based on the selected sensor."""
+        logger.debug(f"Updating metric combo for sensor: '{self.current_selected_dashboard_plot_sensor}'")
+        self.dashboard_plot_metric_type_combo.blockSignals(True)
+        self.dashboard_plot_metric_type_combo.clear()
+        self.dashboard_plot_metric_display_to_actual_map.clear()
 
-        if not data:
-            logger.debug("DashboardTab: No data available in update_sensor_values. Setting displays to N/A.")
-            for display_widget in self.sensor_display_widgets.values():
-                display_widget.update_value(None)
-                display_widget.update() # Force repaint for N/A state
+        enabled_sensor_configs = self.settings_manager.get_sensor_configurations()
+        selected_sensor = self.current_selected_dashboard_plot_sensor
+
+        metrics_to_consider = []
+        if selected_sensor == "All Sensors":
+            for s_type, metrics in enabled_sensor_configs.items():
+                for m_type in metrics.keys():
+                    unit = self.settings_manager.get_unit(s_type, m_type)
+                    display_name = f"{s_type} {m_type.capitalize()} ({unit})" if unit else f"{s_type} {m_type.capitalize()}"
+                    metrics_to_consider.append((display_name, m_type, s_type))
+        elif selected_sensor in enabled_sensor_configs:
+            for m_type in enabled_sensor_configs[selected_sensor].keys():
+                unit = self.settings_manager.get_unit(selected_sensor, m_type)
+                display_name = f"{selected_sensor} {m_type.capitalize()} ({unit})" if unit else f"{selected_sensor} {m_type.capitalize()}"
+                metrics_to_consider.append((display_name, m_type, selected_sensor))
+
+        metrics_to_consider.sort(key=lambda x: x[0])
+
+        if not metrics_to_consider:
+            self.dashboard_plot_metric_type_combo.addItem("No Metrics Available")
+            self.dashboard_plot_metric_type_combo.setEnabled(False)
+            self.plot_widget.clear_plot("No metrics for this sensor.")
+            self.dashboard_plot_metric_type_combo.blockSignals(False)
             return
 
-        for sensor_type, metrics in data.items():
-            for metric_type, value_dict in metrics.items():
-                widget_key = f"{sensor_type}_{metric_type}"
-                if widget_key in self.sensor_display_widgets:
-                    # Check if 'value' key exists in the nested dictionary
-                    if 'value' in value_dict:
-                        value = value_dict['value']
-                        self.sensor_display_widgets[widget_key].update_value(value) # Pass only value
-                        
-                        # --- MODIFICATION START ---
-                        # Explicitly call update() for ALL types now, as per user request to force display
-                        # This overrides the internal 'no repaint if value unchanged' logic
-                        self.sensor_display_widgets[widget_key].update() # Force repaint
-                        # --- MODIFICATION END ---
+        # Add "Combined" option for all available metrics in the current view
+        if len(metrics_to_consider) > 1:
+            self.dashboard_plot_metric_type_combo.addItem("Combined")
+            self.dashboard_plot_metric_display_to_actual_map["Combined"] = [(item[2], item[1]) for item in metrics_to_consider]
 
-                        logger.debug(f"DashboardTab: Updated {sensor_type} {metric_type} display with value: {value}.")
-                    else:
-                        self.sensor_display_widgets[widget_key].update_value(None) # Set to N/A if 'value' key is missing
-                        self.sensor_display_widgets[widget_key].update() # Force repaint for N/A state
-                        logger.warning(f"DashboardTab: 'value' key missing for {sensor_type} {metric_type} in data. Setting to N/A.")
-                else:
-                    logger.warning(f"DashboardTab: No display widget found for {widget_key}. Data received but not displayed.")
-        logger.debug("DashboardTab: All sensor display widgets updated.")
+        # Generate and add combinations
+        combinations = self._generate_metric_combinations_dashboard(metrics_to_consider, selected_sensor)
+        for combo_display_name, combo_metric_pairs in sorted(combinations.items()):
+            self.dashboard_plot_metric_type_combo.addItem(combo_display_name)
+            self.dashboard_plot_metric_display_to_actual_map[combo_display_name] = combo_metric_pairs
 
+        # Add individual metrics
+        for display_name, actual_metric_type, actual_sensor_type in metrics_to_consider:
+            self.dashboard_plot_metric_type_combo.addItem(display_name)
+            self.dashboard_plot_metric_display_to_actual_map[display_name] = [(actual_sensor_type, actual_metric_type)]
 
-    def update_plot_data(self):
+        self.dashboard_plot_metric_type_combo.setEnabled(True)
+        # Restore previous selection
+        initial_plot_metric_display_name = self.settings_manager.get_setting('UI', 'dashboard_plot_selected_metric', fallback=self.dashboard_plot_metric_type_combo.itemText(0))
+        index = self.dashboard_plot_metric_type_combo.findText(initial_plot_metric_display_name)
+        if index != -1:
+            self.dashboard_plot_metric_type_combo.setCurrentIndex(index)
+        elif self.dashboard_plot_metric_type_combo.count() > 0:
+            self.dashboard_plot_metric_type_combo.setCurrentIndex(0)
+
+        self.current_selected_dashboard_plot_metric_type = self.dashboard_plot_metric_type_combo.currentText()
+        self.dashboard_plot_metric_type_combo.blockSignals(False)
+        self._on_plot_timer_timeout() # Trigger a plot update with new metric options
+
+    def _generate_metric_combinations_dashboard(self, enabled_metrics_for_combo, selected_sensor):
         """
-        Fetches historical data based on current selections and updates the plot.
+        Generates display names and actual (sensor_type, metric_type) pairs for combinations.
+        If a specific sensor is selected, it combines its metrics regardless of unit.
+        If "All Sensors" is selected, it combines metrics that share the same unit.
         """
-        logger.info("DashboardTab: Updating plot data.")
-        selected_time_range = self.time_range_combo.currentText()
-        selected_metric_data = self.sensor_metric_combo.currentData() # This is like "HTU21D_temperature" or "all"
+        combinations = collections.OrderedDict()
 
-        if selected_metric_data == "all":
-            # Plot all available sensor metrics
-            plot_data_series = []
-            configured_sensors = self.main_window.settings_manager.get_sensor_configs()
-            display_order = ['HTU21D', 'BMP180', 'BH1750']
+        if selected_sensor != "All Sensors":
+            # Combine all metrics for a single sensor, regardless of unit
+            if len(enabled_metrics_for_combo) >= 2:
+                for r in range(2, len(enabled_metrics_for_combo) + 1):
+                    for combo_items in itertools_combinations(enabled_metrics_for_combo, r):
+                        combo_display_names_parts = [f"{item[2]} {item[1].capitalize()}" for item in combo_items]
+                        combo_actual_pairs = [(item[2], item[1]) for item in combo_items]
 
-            for sensor_type in display_order:
-                if sensor_type in configured_sensors:
-                    for metric_type in configured_sensors[sensor_type]:
-                        unit = self.main_window.settings_manager.get_unit_for_metric(sensor_type, metric_type)
-                        label = f"{sensor_type} {metric_type.capitalize()}"
-                        
-                        # Get historical data for each metric
-                        x_data, y_data = self.data_store.get_historical_data(
-                            sensor_type=sensor_type,
-                            metric_type=metric_type,
-                            time_range_str=selected_time_range
-                        )
-                        # Get thresholds for the plot lines
-                        # --- FIX: Use lowercase keys when getting thresholds from self.thresholds ---
-                        metric_thresholds = self.thresholds.get(sensor_type.lower(), {}).get(metric_type.lower(), {})
-                        low_thr = metric_thresholds.get('low')
-                        high_thr = metric_thresholds.get('high')
+                        final_display_name = "/".join(combo_display_names_parts)
+                        combinations[final_display_name] = combo_actual_pairs
+        else: # "All Sensors" selected, group by unit for sensible plotting
+            metrics_by_unit = collections.defaultdict(list)
+            for display_name, m_type, s_type in enabled_metrics_for_combo:
+                unit = self.settings_manager.get_unit(s_type, m_type)
+                metrics_by_unit[unit].append((display_name, m_type, s_type))
 
-                        plot_data_series.append({
-                            'x': x_data,
-                            'y': y_data,
-                            'label': label,
-                            'y_unit': unit,
-                            'low_threshold': low_thr,
-                            'high_threshold': high_thr
-                        })
-            if plot_data_series:
-                self.matplotlib_widget.plot_data(plot_data_series, self.theme_colors)
+            for unit, metrics_in_unit in metrics_by_unit.items():
+                if len(metrics_in_unit) >= 2:
+                    for r in range(2, len(metrics_in_unit) + 1):
+                        for combo_items in itertools_combinations(metrics_in_unit, r):
+                            combo_display_names_parts = [f"{item[2]} {item[1].capitalize()}" for item in combo_items]
+                            combo_actual_pairs = [(item[2], item[1]) for item in combo_items]
+
+                            display_name_base = "/".join(combo_display_names_parts)
+                            final_display_name = f"{display_name_base} ({unit})" if unit else display_name_base
+                            combinations[final_display_name] = combo_actual_pairs
+
+        return combinations
+
+    @pyqtSlot(str, str, object)
+    def _on_settings_updated(self, section, key, value):
+        """Responds to changes in application settings."""
+        logger.debug(f"DashboardTab._on_settings_updated: Settings updated - Section: {section}, Key: '{key}', Value: {value}.")
+
+        if 'Sensor_' in section:
+            logger.debug(f"DashboardTab: Sensor config changed ({key}:{value}), re-populating UI.")
+            self.populate_sensor_display_widgets() # This will now update gauges and plot combos
+            self.update_all_sensor_values()
+        elif section == 'General' and key == 'dashboard_plot_time_range':
+            self.dashboard_plot_time_range = value
+            self.dashboard_plot_time_range_combo.setCurrentText(value)
+        elif section == 'General' and key == 'plot_update_interval_ms':
+            # MODIFIED: Call the new method to handle interval changes
+            self.set_plot_update_interval(int(value))
+        elif section == 'UI' and (key == 'hide_matplotlib_toolbar' or key.startswith('gauge_')):
+            self.hide_matplotlib_toolbar = self.settings_manager.get_boolean_setting('UI', 'hide_matplotlib_toolbar', fallback=False)
+            self.plot_widget.set_toolbar_visibility(self.hide_matplotlib_toolbar)
+            self.populate_sensor_display_widgets() # Re-populate to update gauge styles
+        elif section == 'UI' and key == 'theme':
+            logger.debug(f"{self.objectName()}: Theme changed, updating colors.")
+            new_theme_colors = self.settings_manager.get_theme_colors()
+            self.update_theme_colors(new_theme_colors)
+
+    @pyqtSlot(dict)
+    def update_sensor_values(self, data_snapshot):
+        """Updates the values displayed on all active sensor gauges."""
+        if not data_snapshot or 'sensors' not in data_snapshot: return
+
+        for sensor_type_from_source, metrics_data in data_snapshot['sensors'].items():
+            for metric_type_from_source, new_value in metrics_data.items():
+                widget_key = f"{sensor_type_from_source}_{metric_type_from_source}"
+
+                if widget_key in self.sensor_widgets:
+                    self.sensor_widgets[widget_key].update_value(new_value)
+
+    def update_all_sensor_values(self):
+        """Requests the latest data snapshot to update all gauges."""
+        latest_snapshot = self.data_store.get_latest_data()
+        if latest_snapshot:
+            self.update_sensor_values(latest_snapshot)
+
+    # ADDED: New method to set plot update interval
+    def set_plot_update_interval(self, interval_ms):
+        """Sets the update interval for the internal QTimer that triggers plot updates."""
+        logger.debug(f"DashboardTab.set_plot_update_interval: Setting plot update interval to {interval_ms} ms.")
+        self.plot_update_interval_ms = interval_ms
+        if self.plot_update_timer.isActive():
+            self.plot_update_timer.stop()
+        self.plot_update_timer.start(self.plot_update_interval_ms)
+        logger.info(f"Plot update timer interval set to {self.plot_update_interval_ms} ms.")
+
+    @pyqtSlot(str)
+    def _on_plot_time_range_changed(self, time_range):
+        """Handles plot time range changes from the UI."""
+        if not time_range: return
+        self.dashboard_plot_time_range = time_range
+        self.settings_manager.set_setting('General', 'dashboard_plot_time_range', time_range)
+        self._on_plot_timer_timeout()
+
+    # MODIFIED: Add handler for the new sensor combo box
+    @pyqtSlot(str)
+    def _on_plot_sensor_changed(self, sensor_name):
+        """Handles plot sensor changes from the UI."""
+        if not sensor_name: return
+        logger.info(f"DashboardTab: Plot sensor set to '{sensor_name}'.")
+        self.current_selected_dashboard_plot_sensor = sensor_name
+        self.settings_manager.set_setting('UI', 'dashboard_plot_selected_sensor', sensor_name)
+        self._update_metric_combo() # This will update metrics and trigger a plot update
+
+    @pyqtSlot(str)
+    def _on_dashboard_plot_metric_type_changed(self, metric_display_name):
+        """Handles plot metric type changes from the UI (Dashboard tab)."""
+        if not metric_display_name: return
+        logger.info(f"DashboardTab._on_dashboard_plot_metric_type_changed: Plot metric type set to '{metric_display_name}'.")
+        self.current_selected_dashboard_plot_metric_type = metric_display_name
+        self.settings_manager.set_setting('UI', 'dashboard_plot_selected_metric', metric_display_name)
+        self._on_plot_timer_timeout()
+
+    @pyqtSlot()
+    def _on_plot_timer_timeout(self):
+        """
+        Fetches data and updates the plot based on the current time range and selected metric(s).
+        This method is called by the QTimer.
+        """
+        logger.debug(f"DashboardTab._on_plot_timer_timeout: Updating plot via timer.")
+        # Check for valid selections before proceeding
+        if not self.current_selected_dashboard_plot_metric_type or "No Metrics" in self.current_selected_dashboard_plot_metric_type:
+             self.plot_widget.clear_plot("No metric selected to plot.")
+             return
+
+        current_time_range = self.dashboard_plot_time_range_combo.currentText()
+        history = self.data_store.get_data_history(time_range=current_time_range)
+        logger.debug(f"  Full history fetched for dashboard plot. Number of data points: {len(history)}.")
+
+        if not history:
+            self.plot_widget.clear_plot("No data to plot for this time range.")
+            return
+
+        series_to_plot = []
+        all_y_data_collected = []
+
+        x_data_template = []
+        for dp in history:
+            ts = dp.get('timestamp')
+            if isinstance(ts, datetime):
+                x_data_template.append(ts)
+            elif isinstance(ts, str):
+                try:
+                    # Assuming format is like '2024-01-15T10:30:00.123Z' or similar ISO format
+                    dt_obj = datetime.fromisoformat(ts.replace('Z', '+00:00')) if 'Z' in ts else datetime.fromisoformat(ts)
+                    x_data_template.append(dt_obj)
+                except (ValueError, TypeError):
+                    try: # Fallback for time-only strings like HH:MM:SS
+                       dt_obj = datetime.strptime(ts, "%H:%M:%S")
+                       x_data_template.append(dt_obj)
+                    except (ValueError, TypeError):
+                       logger.warning(f"      Could not parse timestamp '{ts}'. Skipping this data point for X-axis.")
+                       x_data_template.append(None)
             else:
-                self.matplotlib_widget.set_status_message("No data available to plot for selected range.")
-                logger.warning("DashboardTab: No data series to plot for 'All Metrics'.")
+                x_data_template.append(None)
 
+        metrics_to_plot_pairs = []
+        selected_display_name = self.current_selected_dashboard_plot_metric_type
+
+        if selected_display_name in self.dashboard_plot_metric_display_to_actual_map:
+            metrics_to_plot_pairs = self.dashboard_plot_metric_display_to_actual_map[selected_display_name]
         else:
-            # Plot a single selected sensor metric
-            parts = selected_metric_data.split('_')
-            sensor_type = parts[0]
-            metric_type = parts[1]
-            unit = self.main_window.settings_manager.get_unit_for_metric(sensor_type, metric_type)
-            label = f"{sensor_type} {metric_type.capitalize()}"
+            logger.warning(f"Invalid dashboard plot metric selection: '{selected_display_name}'. Clearing plot.")
+            self.plot_widget.clear_plot("Invalid metric selection.")
+            return
 
-            x_data, y_data = self.data_store.get_historical_data(
-                sensor_type=sensor_type,
-                metric_type=metric_type,
-                time_range_str=selected_time_range
-            )
-            
-            # Get thresholds for the plot lines
-            # --- FIX: Use lowercase keys when getting thresholds from self.thresholds ---
-            metric_thresholds = self.thresholds.get(sensor_type.lower(), {}).get(metric_type.lower(), {})
-            low_thr = metric_thresholds.get('low')
-            high_thr = metric_thresholds.get('high')
+        plot_title_base = "Live Sensor Readings Over Time"
+        show_legend_for_plot = True
 
-            if x_data and y_data:
-                plot_data_series = [{
-                    'x': x_data,
-                    'y': y_data,
-                    'label': label,
-                    'y_unit': unit,
-                    'low_threshold': low_thr,
-                    'high_threshold': high_thr
-                }]
-                self.matplotlib_widget.plot_data(plot_data_series, self.theme_colors)
+        if len(metrics_to_plot_pairs) == 1:
+            s_type, m_type = metrics_to_plot_pairs[0]
+            plot_title_base = f"{s_type} {m_type.capitalize()} Trend"
+            show_legend_for_plot = False
+        else:
+            plot_title_base = f"Live Sensor Data: {selected_display_name}"
+            show_legend_for_plot = True
+
+        has_any_valid_data = False
+
+        for s_type, m_type in metrics_to_plot_pairs:
+            is_metric_enabled = self.settings_manager.get_boolean_setting('Sensor_Presence', f"{s_type.lower()}_{m_type.lower()}_present", fallback=False)
+            if not is_metric_enabled:
+                logger.debug(f"    Metric '{s_type}/{m_type}' is disabled. Skipping plot series.")
+                continue
+
+            y_data = [dp['sensors'].get(s_type, {}).get(m_type) for dp in history]
+
+            valid_data_points = [(x, y) for x, y in zip(x_data_template, y_data) if x is not None and y is not None]
+
+            if not valid_data_points:
+                logger.debug(f"    No valid data points for '{s_type}/{m_type}'. Skipping series.")
+                continue
+
+            x_data_filtered = [dp[0] for dp in valid_data_points]
+            y_data_filtered = [dp[1] for dp in valid_data_points]
+            all_y_data_collected.extend(y_data_filtered)
+
+            unit = self.settings_manager.get_unit(s_type, m_type) or ""
+
+            low_threshold_value = self.settings_manager.get_threshold(s_type, m_type, 'warning_low_value')
+            high_threshold_value = self.settings_manager.get_threshold(s_type, m_type, 'critical_high_value')
+
+            series_to_plot.append({
+                'label': f"{s_type} {m_type.capitalize()} ({unit})",
+                'x_data': x_data_filtered,
+                'y_data': y_data_filtered,
+                'low_threshold': low_threshold_value,
+                'high_threshold': high_threshold_value
+            })
+            has_any_valid_data = True
+
+        if not has_any_valid_data:
+            self.plot_widget.clear_plot("No enabled sensor data to plot for this time range.")
+            return
+
+        y_label_text = "Value"
+        # Determine appropriate Y-axis label
+        all_units = {self.settings_manager.get_unit(s, m) for s, m in metrics_to_plot_pairs}
+        all_units.discard(None) # Remove None if present
+        all_units.discard('') # Remove empty string if present
+
+        if len(all_units) == 1:
+            y_label_text = f"Value ({list(all_units)[0]})"
+        # If units are mixed, the generic "Value" is best.
+
+        if all_y_data_collected:
+            data_y_min = min(all_y_data_collected)
+            data_y_max = max(all_y_data_collected)
+
+            if data_y_min == data_y_max:
+                if data_y_max == 0.0:
+                    y_min_plot, y_max_plot = -0.5, 0.5
+                else:
+                    y_min_plot, y_max_plot = data_y_max * 0.9, data_y_max * 1.1
             else:
-                self.matplotlib_widget.set_status_message(f"No historical data for {label} in {selected_time_range}.")
-                logger.warning(f"DashboardTab: No historical data for {label} in {selected_time_range}.")
+                y_buffer = (data_y_max - data_y_min) * 0.1
+                y_min_plot = data_y_min - y_buffer
+                y_max_plot = data_y_max + y_buffer
 
-        logger.info("DashboardTab: Plot data update completed.")
+            if hasattr(self.plot_widget, 'set_ylim'):
+                self.plot_widget.set_ylim(y_min_plot, y_max_plot)
+            else:
+                logger.warning("DashboardTab: plot_widget has no 'set_ylim' method. Cannot force Y-axis range.")
 
+        self.plot_widget.plot_series(
+            series_to_plot,
+            plot_title=plot_title_base,
+            x_label="Time",
+            y_label=y_label_text,
+            time_series=True,
+            show_legend=show_legend_for_plot,
+            draw_now=True,
+            clear_plot=True
+        )
+        logger.info("DashboardTab: Plot updated successfully.")
 
-    def update_theme_colors(self, theme_colors):
-        """Updates the theme colors for this tab's plot widget and re-polishes the tab."""
-        logger.debug("DashboardTab: Updating theme colors and re-polishing.")
-        self.theme_colors.update(theme_colors) # Store theme colors
+    #@pyqtSlot(dict)
+    #def update_theme_colors(self, new_theme_colors):
+    #    """
+    #    Updates the theme colors for this tab and its child widgets.
+    #    """
+    #    logger.info(f"{self.objectName()}: update_theme_colors called.")
 
-        # Propagate theme colors to the MatplotlibWidget instance
-        self.matplotlib_widget.theme_colors.update(self.theme_colors) # Pass the tab's (now updated) theme_colors
-        self.matplotlib_widget.apply_theme() # Re-apply theme to redraw plot with new colors
+    #    self.theme_colors = dict(new_theme_colors) if new_theme_colors is not None else {}
 
-        # Apply QSS styling to the group box and combo boxes
-        self.style().polish(self)
-        for group_box in self.findChildren(QGroupBox):
-            group_box.style().polish(group_box)
+    #    if not self.theme_colors:
+    #        logger.warning(f"{self.objectName()} received empty theme colors.")
 
-        # Polish the combo boxes
-        self.time_range_combo.style().polish(self.time_range_combo)
-        self.sensor_metric_combo.style().polish(self.sensor_metric_combo) # Polish the new single combo
+    #    self.populate_sensor_display_widgets()
 
-        # Also polish labels within the top controls layout
-        for label in self.findChildren(QLabel):
-            label.style().polish(label)
+    #    if hasattr(self, 'plot_widget'):
+    #        self.plot_widget.update_theme_colors(self.theme_colors)
+    #        #self.plot_widget.style.polish(self.plot_widget)
+        #self.style().polish(self)            
 
-        logger.debug("DashboardTab: Tab re-polished to apply new theme QSS.")
-        # CRITICAL FIX: Also ensure SensorDisplayWidgets are updated with new theme colors AND thresholds
-        for display_widget in self.sensor_display_widgets.values():
-            # Pass the theme colors to update its appearance based on alert state
-            display_widget.update_theme_colors(self.theme_colors) # Pass the tab's (now updated) theme_colors
-
-    def update_gauge_styles(self, gauge_type, gauge_style):
+    @pyqtSlot(dict)
+    def update_theme_colors(self, new_theme_colors):
         """
-        Propagates gauge type and style changes to all SensorDisplayWidgets on this tab.
-        This method is called by AnaviSensorUI.
+        Updates the theme colors for this tab and its child widgets.
         """
-        logger.info(f"DashboardTab: Propagating gauge style (Type='{gauge_type}', Style='{gauge_style}') to individual displays.")
-        # Iterate through the stored sensor_display_widgets dictionary
-        for display_widget in self.sensor_display_widgets.values():
-            display_widget.update_gauge_display_type_and_style(gauge_type, gauge_style)
-        logger.debug("DashboardTab: All SensorDisplayWidgets updated with new gauge style.")    
+        logger.info(f"{self.objectName()}: update_theme_colors called.")
 
-    def _get_num_data_points_for_time_range(self, time_range_str):
-        """
-        Converts a time range string (e.g., "Last 10 minutes") to a number of data points.
-        Assumes the sampling rate from settings_manager.
-        This method is now mostly for illustrative purposes, as get_historical_data
-        now uses time-based filtering.
-        """
-        if time_range_str == "All Data":
-            return self.data_store.max_points
+        # Use the new theme colors if they are provided, otherwise initialize an empty dict
+        self.theme_colors = dict(new_theme_colors) if new_theme_colors is not None else {}
 
-        max_points = self.data_store.max_points
-        sampling_rate_ms = self.main_window.settings_manager.get_setting('General', 'sampling_rate_ms', type=int, default=5000)
-        sampling_rate_sec = sampling_rate_ms / 1000.0
+        # ---- FIX ----
+        # If the theme_colors dictionary is empty, it means the update was triggered
+        # without the necessary data, so we fetch it directly from the SettingsManager.
+        if not self.theme_colors:
+            logger.warning(f"{self.objectName()} received empty theme colors. Fetching from SettingsManager.")
+            self.theme_colors = self.settings_manager.get_theme_colors() # <-- This is the key line
 
-        unit_map = {
-            "minute": 60,
-            "minutes": 60,
-            "hour": 3600,
-            "hours": 3600,
-            "day": 86400,
-            "days": 86400
-        }
+        # Now, proceed with the updated theme_colors
+        self.populate_sensor_display_widgets()
 
-        match = re.match(r"Last (\d+)\s*(minute|minutes|hour|hours|day|days)", time_range_str, re.IGNORECASE)
-        if match:
-            value = int(match.group(1))
-            unit = match.group(2).lower()
-            duration_sec = value * unit_map.get(unit, 1)
-            
-            # Calculate num_points needed to cover the duration, clamped by max_points
-            num_points = min(max_points, int(duration_sec / sampling_rate_sec))
-            logger.debug(f"DashboardTab: Time range '{time_range_str}' resolves to ~{num_points} data points.")
-            return num_points
-        
-        logger.warning(f"DashboardTab: Unknown time range format: '{time_range_str}'. Returning max_points.")
-        return max_points # Fallback
+        if hasattr(self, 'plot_widget'):
+            self.plot_widget.update_theme_colors(self.theme_colors)        

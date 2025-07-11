@@ -1,302 +1,352 @@
+# widgets/matplotlib_widget.py
 # -*- coding: utf-8 -*-
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QSizePolicy, QLabel
-from PyQt5.QtCore import QTimer, QDateTime, Qt, QRect, QPoint, QPointF
-from PyQt5.QtGui import QColor, QFont
-import matplotlib.pyplot as plt
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QSizePolicy, QApplication
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal, pyqtSlot
+from PyQt5.QtGui import QColor, QFont, QFontDatabase
+
+import matplotlib
+matplotlib.use('Qt5Agg') # Use the Qt5Agg backend
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.figure import Figure
+import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm 
+
 import logging
-import datetime
-import numpy as np # Explicitly import numpy
 
 logger = logging.getLogger(__name__)
 
 class MatplotlibWidget(QWidget):
     """
-    A PyQt5 widget that embeds a Matplotlib figure,
-    providing a customizable plot for sensor data, now with an interactive legend.
-    It can optionally hide the Matplotlib toolbar.
+    A Qt widget that embeds a Matplotlib figure for plotting sensor data.
+    Provides basic plotting functionality and theme integration.
     """
-    def __init__(self, parent=None, theme_colors=None, show_toolbar=True, show_default_title=False): # NEW: show_toolbar parameter
-        """
-        Initializes the MatplotlibWidget.
-        :param parent: Parent QWidget.
-        :param theme_colors: Dictionary of theme colors.
-        :param show_toolbar: Boolean, if True, the Matplotlib toolbar is displayed.
-        :param show_default_title: Boolean, if True, the default "Sensor Data Trends" title is shown when plot is cleared.
-        """
+    def __init__(self, theme_colors, settings_manager, parent=None, hide_toolbar=False):
         super().__init__(parent)
-        # --- FIX: Ensure theme_colors is always a mutable dictionary, even if None is passed ---
-        self.theme_colors = dict(theme_colors) if theme_colors is not None else {}
-        self.show_toolbar = show_toolbar # Store the toolbar visibility setting
-        self.show_default_title = show_default_title # Store the title visibility setting
+        self.setObjectName("MatplotlibWidget")
         
-        # Initialize the figure and axes
-        self.figure, self.ax = plt.subplots(facecolor='none', edgecolor='none') 
-        
+        self.theme_colors = theme_colors # Initial theme colors
+        self.settings_manager = settings_manager
+        self.hide_toolbar = hide_toolbar
+
+        self.figure = Figure()
         self.canvas = FigureCanvas(self.figure)
-        self.canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.canvas.updateGeometry()
+        self.toolbar = NavigationToolbar(self.canvas, self)
+        
+        self.toolbar.setVisible(not self.hide_toolbar) 
 
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
-
-        # Only add toolbar if show_toolbar is True
-        if self.show_toolbar:
-            self.toolbar = NavigationToolbar(self.canvas, self)
-            main_layout.addWidget(self.toolbar)
-        else:
-            self.toolbar = None # Explicitly set to None if not shown
-            logger.debug("MatplotlibWidget: Toolbar hidden as requested.")
-
-
-        main_layout.addWidget(self.canvas)
-
-        self.status_label = QLabel("No data available to plot.")
+        self.ax = self.figure.add_subplot(111) 
+        
+        self.status_label = QLabel("Loading plot data...")
         self.status_label.setAlignment(Qt.AlignCenter)
-        self.status_label.setStyleSheet("color: #E0F2F7; font-size: 16px;")
-        self.status_label.setVisible(False)
-        main_layout.addWidget(self.status_label)
-
-        # Initialize legend related attributes BEFORE calling apply_theme()
-        self.legend_lines = {}
-        self.legend_visible = {}
-        self.legend_proxy = None
-
-        self.apply_theme() # Call apply_theme after self.theme_colors is surely set
-        self.setMinimumSize(400, 380)
-        logger.debug(f"MatplotlibWidget initialized. Minimum size: {self.minimumSize()}. Toolbar visible: {self.show_toolbar}")
-
-        # Connect the pick event for interactive legend
-        self.figure.canvas.mpl_connect('pick_event', self._on_pick)
-
-
-    def apply_theme(self):
-        """Applies theme colors to the Matplotlib figure and axes."""
-        # --- FIX: Add a more robust check for theme_colors content ---
-        if not self.theme_colors or not any(self.theme_colors.values()): # Check if dict is empty or all values are falsy
-            logger.warning("MatplotlibWidget: Theme colors dictionary is empty or contains no valid colors. Cannot apply theme effectively.")
-            # Optionally, you might want to load default colors here if self.theme_colors is empty
-            # For now, we will just proceed with defaults from .get() calls
-            pass # Continue to use .get() with defaults
-
-        self.figure.patch.set_facecolor(self.theme_colors.get('plot_facecolor', '#1A2A40'))
-        self.figure.patch.set_edgecolor(self.theme_colors.get('plot_edgecolor', '#3C6595'))
-
-        # Background color for axes
-        self.ax.set_facecolor(self.theme_colors.get('plot_background', '#1A2A40')) # Assuming plot_background might be a separate key for ax.set_facecolor
-
-        # Set spine colors
-        self.ax.spines['bottom'].set_color(self.theme_colors.get('plot_edgecolor', '#3C6595'))
-        self.ax.spines['top'].set_color(self.theme_colors.get('plot_edgecolor', '#3C6595'))
-        self.ax.spines['right'].set_color(self.theme_colors.get('plot_edgecolor', '#3C6595'))
-        self.ax.spines['left'].set_color(self.theme_colors.get('plot_edgecolor', '#3C6595'))
-
-        # Set tick colors
-        self.ax.tick_params(axis='x', colors=self.theme_colors.get('plot_tick_color', '#E0F2F7'))
-        self.ax.tick_params(axis='y', colors=self.theme_colors.get('plot_tick_color', '#E0F2F7'))
-
-        # Set label colors
-        self.ax.xaxis.label.set_color(self.theme_colors.get('plot_label_color', '#87EEBC')) # Default changed to match other labels
-        self.ax.yaxis.label.set_color(self.theme_colors.get('plot_label_color', '#87EEBC')) # Default changed to match other labels
+        self.status_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.status_label.hide() 
         
-        # Ensure tick label colors are also set
-        for label in self.ax.get_xticklabels():
-            label.set_color(self.theme_colors.get('plot_tick_color', '#E0F2F7'))
-        for label in self.ax.get_yticklabels():
-            label.set_color(self.theme_colors.get('plot_tick_color', '#E0F2F7'))
+        self.vertical_layout = QVBoxLayout(self)
+        self.vertical_layout.addWidget(self.toolbar)
+        self.vertical_layout.addWidget(self.canvas)
+        self.vertical_layout.addWidget(self.status_label) 
 
-        # Set title color
-        self.ax.title.set_color(self.theme_colors.get('plot_title_color', '#4682B4'))
-        self.ax.grid(True, color=self.theme_colors.get('plot_grid_color', '#C0D8E8'), linestyle=':', linewidth=0.5)
+        self.vertical_layout.setContentsMargins(0, 0, 0, 0)
+        self.vertical_layout.setSpacing(0)
 
-        # Update legend colors if legend exists
-        if self.legend_proxy:
-            legend = self.legend_proxy
-            legend.get_frame().set_facecolor(self.theme_colors.get('plot_legend_facecolor', '#2A3B4C'))
-            legend.get_frame().set_edgecolor(self.theme_colors.get('plot_legend_edgecolor', '#3C6595'))
+        # Set initial background to transparent to allow QSS styling
+        self.figure.patch.set_alpha(0.0) 
+        self.ax.patch.set_alpha(0.0)
+
+        self.apply_initial_theme() 
+        
+        # Polish self in init to apply QSS immediately to the widget's own background
+        self.style().polish(self) 
+        logger.info("MatplotlibWidget initialized.")
+        
+
+    def _get_color_from_theme(self, key, default_color):
+        """Helper to safely get a QColor from theme_colors and convert to hex string."""
+        color_val = self.theme_colors.get(key, default_color)
+        if isinstance(color_val, QColor):
+            return color_val.name()
+        elif isinstance(color_val, str):
+            # If it's a string (e.g., '#RRGGBB'), ensure it's a valid QColor then return name
+            return QColor(color_val).name()
+        return QColor(default_color).name() # Fallback
+
+    def _apply_matplotlib_theme_elements(self):
+        """
+        Applies all theme-related colors and fonts to the Matplotlib figure and axes.
+        This method should be called whenever the theme changes or the plot is cleared/redrawn.
+        """
+        logger.debug("MatplotlibWidget: Applying Matplotlib theme elements.")
+
+        # --- Figure and Axes Backgrounds ---
+        self.figure.set_facecolor(self._get_color_from_theme('matplotlib_figure_facecolor', '#2E2E2E')) # Default to dark
+        self.ax.set_facecolor(self._get_color_from_theme('matplotlib_axes_facecolor', '#383838')) # Default to dark
+
+        # --- Spines (Borders of the plot area) ---
+        spine_color = self._get_color_from_theme('matplotlib_edgecolor', '#606060')
+        self.ax.spines['bottom'].set_color(spine_color)
+        self.ax.spines['top'].set_color(spine_color)
+        self.ax.spines['left'].set_color(spine_color)
+        self.ax.spines['right'].set_color(spine_color)
+
+        # --- Tick Labels (Numbers on axes) ---
+        tick_color = self._get_color_from_theme('matplotlib_tick_color', '#E0E0E0')
+        self.ax.tick_params(axis='x', colors=tick_color)
+        self.ax.tick_params(axis='y', colors=tick_color)
+        
+        # --- Axis Labels (e.g., "Time", "Value") ---
+        label_color = self._get_color_from_theme('matplotlib_label_color', '#E0E0E0')
+        self.ax.xaxis.label.set_color(label_color)
+        self.ax.yaxis.label.set_color(label_color)
+
+        # --- Title ---
+        title_color = self._get_color_from_theme('matplotlib_title_color', '#00B0FF')
+        if self.ax.get_title():
+            self.ax.set_title(self.ax.get_title(), color=title_color)
+        
+        # --- Grid Lines ---
+        grid_color = self._get_color_from_theme('matplotlib_grid_color', '#555555')
+        self.ax.grid(True, linestyle=':', alpha=0.6, color=grid_color)
+
+        # --- Legend ---
+        legend = self.ax.get_legend()
+        if legend:
+            legend_facecolor = self._get_color_from_theme('matplotlib_legend_facecolor', '#4A4A4A')
+            legend_edgecolor = self._get_color_from_theme('matplotlib_edgecolor', '#606060') 
+            legend_label_color = self._get_color_from_theme('matplotlib_legend_label_color', '#E0E0E0')
+
+            legend.get_frame().set_facecolor(legend_facecolor)
+            legend.get_frame().set_edgecolor(legend_edgecolor)
             for text in legend.get_texts():
-                text.set_color(self.theme_colors.get('plot_legend_labelcolor', '#E0F2F7'))
+                text.set_color(legend_label_color)
 
-        self.canvas.draw_idle()
-        logger.debug("MatplotlibWidget: Theme applied and plot redrawn.")
+        # --- Apply Font Settings (separate method, but part of theming) ---
+        self.apply_font_settings() 
+
+        self.canvas.draw_idle() 
+        logger.debug("MatplotlibWidget: Matplotlib theme elements applied.")
 
 
-    def plot_data(self, series_data, theme_colors):
+    def apply_initial_theme(self):
+        """Applies theme colors based on the current self.theme_colors on initialization."""
+        logger.debug("MatplotlibWidget: Applying initial theme.")
+        self._apply_matplotlib_theme_elements() 
+        logger.debug("MatplotlibWidget: Initial theme applied.")
+
+    def set_toolbar_visibility(self, hide):
         """
-        Plots multiple series of data on the same axes.
-        :param series_data: A list of dictionaries, where each dictionary
-                            contains 'x', 'y', 'label', and 'y_unit'.
-        :param theme_colors: Dictionary of theme colors, passed to apply_theme.
+        Sets the visibility of the Matplotlib toolbar.
+        :param hide: Boolean, True to hide, False to show.
         """
-        logger.debug(f"MatplotlibWidget: Plotting data. Number of series: {len(series_data)}")
-        self.hide_status_message()
-        self.ax.clear()
-        # --- FIX: Ensure theme_colors is updated before applying theme for plotting ---
-        self.theme_colors.update(theme_colors) # Update internal theme_colors
-        self.apply_theme() # Then apply the updated theme
+        self.toolbar.setVisible(not hide)
+        self.hide_toolbar = hide
+        logger.debug(f"MatplotlibWidget: Toolbar visibility set to {'hidden' if hide else 'visible'}.")
 
-        self.legend_lines.clear()
-        self.legend_visible.clear()
+    def plot_series(self, series_data, plot_title="", x_label="", y_label="",
+                    time_series=False, show_legend=True, draw_now=True, clear_plot=True):
+        """
+        Plots multiple series on the Matplotlib figure.
+        :param series_data: A list of dictionaries, each containing 'x_data', 'y_data', 'label', 'color'.
+                            Optionally, 'low_threshold', 'high_threshold' for horizontal lines.
+        :param plot_title: Title of the plot.
+        :param x_label: Label for the x-axis.
+        :param y_label: Label for the y-axis.
+        :param time_series: If True, format x-axis as time.
+        :param show_legend: If True, display the legend.
+        :param draw_now: If True, redraw the canvas immediately.
+        :param clear_plot: If True, clear the existing plot before drawing.
+        """
+        logger.debug(f"MatplotlibWidget.plot_series: Plotting {len(series_data)} series. Clear plot: {clear_plot}.")
 
-        line_colors_str = self.theme_colors.get('plot_line_colors', '')
-        line_colors = [color.strip() for color in line_colors_str.split(',') if color.strip()]
-        if not line_colors: # Fallback if theme_colors didn't provide any
-            line_colors = ['#87CEEB', '#4CAF50', '#FFD700', '#FF0000', '#A020F0', '#20B2AA', '#DA70D6', '#FF69B4']
-            logger.warning("MatplotlibWidget: 'plot_line_colors' not found or empty in theme, using defaults.")
-
-        all_y_values = []
-        labels = []
-        has_data = False
+        if clear_plot:
+            self.ax.clear()
+            self._apply_matplotlib_theme_elements() 
         
-        y_units = set()
-        
-        for i, series in enumerate(series_data):
-            x_data = series.get('x', [])
-            y_data = series.get('y', [])
-            label = series.get('label', f'Series {i+1}')
-            y_unit = series.get('y_unit', '')
-            low_threshold = series.get('low_threshold')
-            high_threshold = series.get('high_threshold')
-
-            if x_data and y_data:
-                line, = self.ax.plot(x_data, y_data, label=label, color=line_colors[i % len(line_colors)], linewidth=2, picker=5)
-                self.legend_lines[label] = line
-                self.legend_visible[label] = True
-                
-                all_y_values.extend(y_data)
-                labels.append(label)
-                y_units.add(y_unit)
-                has_data = True
-
-                if low_threshold is not None:
-                    self.ax.axhline(low_threshold, color='red', linestyle='--', linewidth=1, zorder=0)
-                    if x_data:
-                        # Position text near the line, at the rightmost x-coordinate available
-                        x_pos = x_data[-1]
-                        self.ax.text(x_pos, low_threshold, f' Low: {low_threshold:.1f}', color='red', va='center', ha='left', fontsize=8,
-                                     backgroundcolor=(0,0,0,0.5), bbox=dict(facecolor='red', alpha=0.1, edgecolor='none', pad=1)) 
-                if high_threshold is not None:
-                    self.ax.axhline(high_threshold, color='red', linestyle='--', linewidth=1, zorder=0)
-                    if x_data:
-                        x_pos = x_data[-1]
-                        self.ax.text(x_pos, high_threshold, f' High: {high_threshold:.1f}', color='red', va='center', ha='left', fontsize=8,
-                                     backgroundcolor=(0,0,0,0.5), bbox=dict(facecolor='red', alpha=0.1, edgecolor='none', pad=1))
-            else:
-                logger.warning(f"MatplotlibWidget: Skipping plot for series '{label}' due to empty data.")
-
-        if not has_data:
-            self.set_status_message("No data available for selected time range.")
+        if not series_data:
+            self.clear_plot("No data provided to plot.")
             return
 
+        self.ax.set_title(plot_title, color=self._get_color_from_theme('matplotlib_title_color', '#00B0FF'))
+        self.ax.set_xlabel(x_label, color=self._get_color_from_theme('matplotlib_label_color', '#E0E0E0'))
+        self.ax.set_ylabel(y_label, color=self._get_color_from_theme('matplotlib_label_color', '#E0E0E0'))
+
+        theme_line_colors = self.theme_colors.get('matplotlib_line_colors', [])
+        if not theme_line_colors: 
+            theme_line_colors = [QColor("#F02BFE"), QColor("#D81B60"), QColor("#E040FB"), QColor("#CE93D8")] 
         
-        if self.show_default_title: # CONDITIONAL TITLE SETTING
-            self.ax.set_title("Sensor Data Trends")
-        self.ax.set_xlabel("Time")
-        
-        if len(y_units) == 1:
-            unit_text = list(y_units)[0]
-            #unit_text = unit_text.replace('degC', '\u00B0C') 
-            self.ax.set_ylabel(unit_text)
-        elif len(y_units) > 1:
-            self.ax.set_ylabel("Mixed Units")
-
-        self.figure.autofmt_xdate()
-
-        if labels:
-            main_handles = [self.legend_lines[label] for label in labels if label in self.legend_lines]
-            main_labels = [label for label in labels if label in self.legend_lines]
-            
-            self.legend_proxy = self.ax.legend(main_handles, main_labels, loc='best', frameon=True)
-            self.apply_theme()
-            
-            for legend_line, original_line_label in zip(self.legend_proxy.get_lines(), main_labels):
-                legend_line.set_picker(5)
-                legend_line._original_line = self.legend_lines[original_line_label] 
-        else:
-            if self.ax.legend_ is not None:
-                try:
-                    self.ax.legend().remove()
-                except AttributeError:
-                    logger.debug("MatplotlibWidget: Legend already removed or not present.")
-            self.legend_proxy = None
-
-        if all_y_values:
-            min_y, max_y = np.min(all_y_values), np.max(all_y_values) # Use numpy for min/max
-            # Add a small buffer to the y-axis limits to prevent lines from touching the top/bottom
-            y_range = max_y - min_y
-            if y_range == 0: # Handle cases where all values are the same
-                padding = 0.5
+        matplotlib_line_colors_hex = []
+        for color_item in theme_line_colors:
+            if isinstance(color_item, QColor):
+                matplotlib_line_colors_hex.append(color_item.name())
+            elif isinstance(color_item, str):
+                matplotlib_line_colors_hex.append(QColor(color_item).name())
             else:
-                padding = y_range * 0.1 # 10% padding on each side
-            self.ax.set_ylim(min_y - padding, max_y + padding)
-        
-        self.figure.subplots_adjust(top=0.92, bottom=0.15, left=0.1, right=0.95)
-        self.figure.tight_layout(pad=0.5) 
-        
-        self.canvas.draw_idle()
-        logger.debug("MatplotlibWidget: Plot data drawn and canvas redrawn.")
+                matplotlib_line_colors_hex.append('gray') 
+                logger.warning(f"MatplotlibWidget: Unexpected color item in matplotlib_line_colors: {color_item}. Using gray.")
 
+        plt.rcParams['axes.prop_cycle'] = plt.cycler(color=matplotlib_line_colors_hex)
 
-    def _on_pick(self, event):
-        """Event handler for interactive legend."""
-        if isinstance(event.artist, plt.matplotlib.lines.Line2D) and hasattr(event.artist, '_original_line'):
-            original_line = event.artist._original_line
-            label = original_line.get_label()
+        for i, series in enumerate(series_data):
+            x_data = series.get('x_data', [])
+            y_data = series.get('y_data', [])
+            label = series.get('label', f"Series {i+1}")
             
-            current_visible = not original_line.get_visible()
-            original_line.set_visible(current_visible)
-            self.legend_visible[label] = current_visible
-
-            if current_visible:
-                event.artist.set_alpha(1.0)
+            series_color_val = series.get('color') 
+            if series_color_val is None:
+                plot_kwargs = {'label': label, 'linewidth': 2}
             else:
-                event.artist.set_alpha(0.2)
+                specific_color_hex = self._get_color_from_theme(None, series_color_val) 
+                plot_kwargs = {'label': label, 'color': specific_color_hex, 'linewidth': 2}
+
+
+            filtered_data = [(x, y) for x, y in zip(x_data, y_data) if y is not None]
+            if not filtered_data:
+                logger.warning(f"MatplotlibWidget: No valid data points for series '{label}'. Skipping plot for this series.")
+                continue
             
-            self.figure.canvas.draw_idle()
-            logger.debug(f"MatplotlibWidget: Toggled visibility for series '{label}' to {current_visible}.")
+            filtered_x_data, filtered_y_data = zip(*filtered_data) 
+            
+            self.ax.plot(filtered_x_data, filtered_y_data, **plot_kwargs)
 
+            # Plot thresholds
+            low_threshold = series.get('low_threshold')
+            high_threshold = series.get('high_threshold')
+            
+            threshold_low_color = self._get_color_from_theme('plot_threshold_low_color', '#FFC107') 
+            threshold_high_color = self._get_color_from_theme('plot_threshold_high_color', '#FF5252') 
 
-    def clear_plot(self):
-        """Clears the plot area."""
-        logger.debug("MatplotlibWidget: Clearing plot.")
+            if low_threshold is not None:
+                self.ax.axhline(y=low_threshold, color=threshold_low_color, 
+                                linestyle='--', linewidth=1, label='Low Threshold')
+            if high_threshold is not None:
+                self.ax.axhline(y=high_threshold, color=threshold_high_color, 
+                                linestyle='--', linewidth=1, label='High Threshold')
+
+        if time_series:
+            self.figure.autofmt_xdate() 
+
+        # --- FIX: Force Matplotlib to recompute limits after plotting new data ---
+        self.ax.relim()  # Recalculate plot limits based on the new data
+        self.ax.autoscale_view(True, True, False) # Autoscale x and y axes, but not z
+        # This helps ensure the plot doesn't appear flat if the data range is small.
+        # --- END FIX ---
+
+        if show_legend:
+            legend_facecolor = self._get_color_from_theme('matplotlib_legend_facecolor', '#4A4A4A')
+            legend_edgecolor = self._get_color_from_theme('matplotlib_edgecolor', '#606060')
+            legend_label_color = self._get_color_from_theme('matplotlib_legend_label_color', '#E0E0E0')
+
+            handles, labels = self.ax.get_legend_handles_labels()
+            unique_labels = list(dict.fromkeys(labels)) 
+            unique_handles = [handles[labels.index(ul)] for ul in unique_labels]
+
+            self.ax.legend(unique_handles, unique_labels, loc='best', frameon=True, 
+                           facecolor=legend_facecolor,
+                           edgecolor=legend_edgecolor,
+                           labelcolor=legend_label_color)
+        
+        self.figure.tight_layout() 
+
+        self.hide_status_message() 
+        if draw_now:
+            self.draw()
+        logger.info("MatplotlibWidget: Data plotted and canvas redrawn.")
+
+    def apply_font_settings(self):
+        """Applies font settings to all text elements in the plot."""
+        logger.debug("MatplotlibWidget: Applying font settings.")
+        font_family = self.theme_colors.get('plot_font_family', "Inter")
+        font_size = self.theme_colors.get('plot_font_size', 10)
+        
+        matplotlib.rcParams['font.family'] = font_family
+        matplotlib.rcParams['font.size'] = font_size
+        
+        title_color = self._get_color_from_theme('matplotlib_title_color', '#00B0FF')
+        label_color = self._get_color_from_theme('matplotlib_label_color', '#E0E0E0')
+        tick_color = self._get_color_from_theme('matplotlib_tick_color', '#E0E0E0')
+        legend_label_color = self._get_color_from_theme('matplotlib_legend_label_color', '#E0E0E0')
+
+        self.ax.set_title(self.ax.get_title(), fontdict={'family': font_family, 'size': font_size, 'color': title_color})
+        self.ax.set_xlabel(self.ax.get_xlabel(), fontdict={'family': font_family, 'size': font_size, 'color': label_color})
+        self.ax.set_ylabel(self.ax.get_ylabel(), fontdict={'family': font_family, 'size': font_size, 'color': label_color})
+
+        for tick_label in self.ax.get_xticklabels() + self.ax.get_yticklabels():
+            tick_label.set_fontsize(font_size)
+            tick_label.set_fontfamily(font_family)
+            tick_label.set_color(tick_color)
+        
+        for text_obj in self.ax.texts:
+            text_obj.set_fontfamily(font_family)
+            text_obj.set_fontsize(font_size)
+            text_obj.set_color(self._get_color_from_theme('matplotlib_text_color', '#E0E0E0')) 
+
+        if self.ax.legend_:
+            for text in self.ax.legend_.get_texts():
+                text.set_fontsize(font_size)
+                text.set_fontfamily(font_family)
+                text.set_color(legend_label_color)
+        
+        logger.debug(f"MatplotlibWidget: Applied font family: {font_family}, size: {font_size}.")
+
+    def clear_plot(self, message=""):
+        """Clears the plot and optionally displays a message."""
+        logger.debug(f"MatplotlibWidget.clear_plot: Clearing plot with message: '{message}'.")
         self.ax.clear()
-        self.apply_theme()
         
-        if self.show_default_title: # CONDITIONAL TITLE SETTING
-            self.ax.set_title("Sensor Data Trends")
-        self.ax.set_xlabel("Time")
-        self.ax.set_ylabel("")
-        
-        self.legend_lines.clear()
-        self.legend_visible.clear()
-        self.legend_proxy = None
+        self._apply_matplotlib_theme_elements() 
 
-        if self.ax.legend_ is not None:
-            try:
-                self.ax.legend().remove()
-                logger.debug("MatplotlibWidget: Legend already removed or not present.")
-            except AttributeError:
-                logger.debug("MatplotlibWidget: Legend already removed or not present.")
+        if message:
+            self.show_status_message(message)
+        else:
+            self.hide_status_message()
+            
+        self.draw() 
+        logger.info("MatplotlibWidget: Plot cleared.")
 
+    def draw(self):
+        """Redraws the canvas."""
         self.canvas.draw_idle()
-        logger.debug("MatplotlibWidget: Plot cleared.")
 
-    def set_status_message(self, message):
+    @pyqtSlot(dict)
+    def update_theme_colors(self, new_theme_colors):
         """
-        Sets a status message on the plot area and makes it visible.
-        Clears the plot when a message is displayed.
+        Updates the theme colors for the plot elements and reapplies them.
+        :param new_theme_colors: Dictionary of new theme colors.
         """
-        self.clear_plot()
+        logger.debug("MatplotlibWidget.update_theme_colors: Called with new theme colors.")
+        self.theme_colors.update(new_theme_colors)
+
+        for key, value in self.theme_colors.items():
+            if isinstance(value, str) and value.startswith('#'): 
+                self.theme_colors[key] = QColor(value)
+            elif isinstance(value, list) and key == 'matplotlib_line_colors': 
+                new_list = []
+                for item in value:
+                    if isinstance(item, str):
+                        new_list.append(QColor(item))
+                    else:
+                        new_list.append(item)
+                self.theme_colors[key] = new_list
+
+        self._apply_matplotlib_theme_elements() 
+        
+        self.style().polish(self) 
+        
+        logger.info("MatplotlibWidget: Theme colors updated.")
+
+    def show_status_message(self, message):
+        """Displays a status message over the plot area."""
         self.status_label.setText(message)
-        self.status_label.setVisible(True)
-        logger.debug(f"MatplotlibWidget: Displaying status message: '{message}'")
+        self.status_label.show()
+        self.canvas.hide()
+        self.toolbar.hide()
+        logger.debug(f"MatplotlibWidget: Showing status message: {message}")
 
     def hide_status_message(self):
-        """
-        Hides the status message.
-        """
-        self.status_label.setVisible(False)
+        """Hides the status message and shows the plot canvas."""
+        self.status_label.hide()
+        self.canvas.show()
+        if not self.hide_toolbar: 
+            self.toolbar.show()
         logger.debug("MatplotlibWidget: Hiding status message.")
 

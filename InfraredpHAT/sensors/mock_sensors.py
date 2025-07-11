@@ -55,7 +55,7 @@ class MockBH1750:
     """Mock sensor for BH1750 (Light)."""
     def __init__(self):
         logger.info("MockBH1750 initialized.")
-        self.last_light = 300.0
+        self.last_light = 00.0
 
     def read_data(self):
         """Generates mock light data with slight variations."""

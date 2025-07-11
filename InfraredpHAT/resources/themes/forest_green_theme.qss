@@ -1,0 +1,1060 @@
+/* themes/forest_green_theme.qss */
+
+/* --- Optimized Properties for Forest Green Theme --- */
+--main-window-bg: #1A2421;
+--label-color: #E8F5E9;
+--groupbox-font-size: 10pt;
+--groupbox-font-weight: bold;
+--groupbox-bg: #2A3F33;
+--groupbox-border-width: 1;
+--groupbox-border-style: solid;
+--groupbox-border-color: #4A6C5B;
+--groupbox-title-color: #A5D6A7;
+--groupbox-border-radius: 8;
+--tabwidget-pane-bg: #2A3F33;
+--tabwidget-pane-border-width: 1;
+--tabwidget-pane-border-style: solid;
+--tabwidget-pane-border-color: #4A6C5B;
+--tab-bg-normal: #1A2421;
+--tab-color-normal: #A5D6A7;
+--tab-bg-selected: #2A3F33;
+--tab-color-selected: #E8F5E9;
+--combobox-bg: #334E44;
+--combobox-color: #E8F5E9;
+--combobox-border: "1px solid #4A6C5B";
+--combobox-border-color: #4A6C5B;
+--combobox-selection-bg: #4CAF50;
+--button-bg-normal: #4CAF50;
+--button-color-normal: #FFFFFF;
+--button-border-color: #4CAF50;
+--button-hover-bg: #66BB6A;
+--button-pressed-bg: #388E3C;
+--button-border-radius: 4;
+--lineedit-bg: #334E44;
+--lineedit-color: #E8F5E9;
+--lineedit-border: "1px solid #4A6C5B";
+--statusbar-bg: #1A2421;
+--statusbar-color: #A5D6A7;
+--info-status-color: #26A69A;
+--warning-status-color: #F59E0B;
+--error-status-color: #F43F5E;
+--gauge-border-width: 1;
+--gauge-border-style: solid;
+--gauge-border-color: #4A6C5B;
+--statusbar-warning-bg: #F59E0B;
+--statusbar-warning-fg: #000000;
+--statusbar-critical-bg: #E53935;
+--statusbar-critical-fg: #FFFFFF;
+
+/* Matplotlib Plot Colors */
+matplotlib_border_normal: 1px solid #4A6C5B;
+matplotlib_container_bg: #1A2421;
+plot_font_size: 10;
+plot_font_family: 'Inter';
+matplotlib_figure_facecolor: #1A2421;
+matplotlib_axes_facecolor: #2A3F33;
+matplotlib_edgecolor: #4A6C5B;
+matplotlib_label_color: #A5D6A7;
+matplotlib_tick_color: #81C784;
+matplotlib_title_color: #A5D6A7;
+matplotlib_grid_color: #334E44;
+matplotlib_legend_facecolor: #334E44;
+matplotlib_legend_label_color: #E8F5E9;
+matplotlib_line_colors: ["#4CAF50", "#4DB6AC", "#F59E0B", "#F43F5E", "#A5D6A7", "#81C784", "#E8F5E9"];
+plot_threshold_low_color: #F59E0B;
+plot_threshold_high_color: #F43F5E;
+plot_na_text_color: #81C784;
+
+/* Custom Drawing Colors */
+font_family: 'Inter';
+digital_font_family: 'Digital-7';
+warning_gauge_background_color: #FFA500;
+warning_gauge_text_color: #000000;
+critical_gauge_text_color: #FFFFFF;
+critical_gauge_background_color: #F43F5E;
+high_contrast_text_color: #FFFFFF;
+
+analog_gauge_background: #2A3F33;
+analog_gauge_border: 1px solid #4A6C5B;
+analog_gauge_label_color: #A5D6A7;
+analog_gauge_text_color: #E8F5E9;
+analog_gauge_scale_color: #81C784;
+analog_gauge_needle_color: #F43F5E;
+analog_gauge_center_dot_color: #A5D6A7;
+analog_gauge_background_alert: #3E2723;
+analog_gauge_center_dot_alert_color: #FF6E40;
+analog_gauge_needle_alert_color: #FF6E40;
+analog_gauge_scale_alert_color: #FFFFFF;
+analog_gauge_text_alert_color: #FFFFFF;
+
+analog_basic_classic_background: #1A2421;
+analog_basic_classic_border: 1px solid #334E44;
+analog_basic_classic_scale_color: #A5D6A7;
+analog_basic_classic_needle_color: #81C784;
+analog_basic_classic_center_dot_color: #81C784;
+analog_basic_classic_text_color: #E8F5E9;
+analog_basic_classic_background_alert: #4E342E;
+analog_basic_classic_border_alert: 1px solid #F43F5E;
+analog_basic_classic_needle_alert_color: #F43F5E;
+analog_basic_classic_center_dot_alert_color: #E8F5E9;
+analog_basic_classic_text_alert_color: #E8F5E9;
+analog_basic_classic_border_color: #4A6C5B;
+analog_basic_classic_border_style: solid;
+analog_basic_classic_border_width: 1;
+analog_basic_classic_fill_color: #2A3F33;
+analog_basic_classic_label_color: #E8F5E9;
+analog_basic_classic_border_alert_color: #FF6E40;
+analog_basic_classic_scale_alert_color: #F59E0B;
+analog_basic_classic_border_alert_width: 2;
+analog_basic_classic_border_alert_style: solid;
+analog_basic_classic_fill_alert: #F43F5E;
+analog_basic_classic_label_alert_color: #FFFFFF;
+analog_basic_classic_text_alert: #F59E0B;
+
+analog_full_classic_background: #101D1A;
+analog_full_classic_border: 1px solid #2A3F33;
+analog_full_classic_scale_color: #FFFFFF;
+analog_full_classic_needle_color: #81C784;
+analog_full_classic_center_dot_color: #81C784;
+analog_full_classic_text_color: #FFFFFF;
+analog_full_classic_background_alert: #4E342E;
+analog_full_classic_border_alert: 1px solid #F43F5E;
+analog_full_classic_needle_alert_color: #F43F5E;
+analog_full_classic_center_dot_alert_color: #E8F5E9;
+analog_full_classic_fill_color: #2A3F33;
+analog_full_classic_label_color: #E8F5E9;
+analog_full_classic_border_width: 1;
+analog_full_classic_border_style: solid;
+analog_full_classic_border_color: #4A6C5B;
+analog_full_classic_scale_alert_color: #FFFFFF;
+analog_full_classic_text_alert_color: #FFFFFF;
+analog_full_classic_border_alert_color: #F43F5E;
+analog_full_classic_border_alert_style: solid;
+analog_full_classic_border_alert_width: 2;
+analog_full_classic_fill_alert: #F43F5E;
+analog_full_classic_label_alert_color: #FFFFFF;
+analog_full_classic_text_alert: #F59E0B;
+
+analog_modern_basic_background: #2A3F33;
+analog_modern_basic_border: 1px solid #4A6C5B;
+analog_modern_basic_scale_color: #E8F5E9;
+analog_modern_basic_needle_color: #FF6E40;
+analog_modern_basic_center_dot_color: #FF6E40;
+analog_modern_basic_text_color: #E8F5E9;
+analog_modern_basic_background_alert: #1B2C27;
+analog_modern_basic_border_alert: 1px solid #F43F5E;
+analog_modern_basic_fill_color: #2A3F33;
+analog_modern_basic_label_color: #E8F5E9;
+analog_modern_basic_border_width: 1;
+analog_modern_basic_border_style: solid;
+analog_modern_basic_border_color: #4A6C5B;
+analog_modern_basic_center_dot_alert_color: #FF6E40;
+analog_modern_basic_scale_alert_color: #E8F5E9;
+analog_modern_basic_text_alert_color: #E8F5E9;
+analog_modern_basic_needle_alert_color: #F43F5E;
+
+analog_modern_full_background: #2A3F33;
+analog_modern_full_border: 1px solid #4A6C5B;
+analog_modern_full_scale_color: #E8F5E9;
+analog_modern_full_needle_color: #FF6E40;
+analog_modern_full_center_dot_color: #FF6E40;
+analog_modern_full_text_color: #E8F5E9;
+analog_modern_full_background_alert: #1B2C27;
+analog_modern_full_border_alert: 1px solid #F43F5E;
+analog_modern_full_border_color: #4A6C5B;
+analog_modern_full_border_style: solid;
+analog_modern_full_border_width: 1;
+analog_modern_full_fill_color: #334E44;
+analog_modern_full_label_color: #E8F5E9;
+analog_modern_full_center_dot_alert_color: #FF6E40;
+analog_modern_full_needle_alert_color: #FF6E40;
+analog_modern_full_scale_alert_color: #E8F5E9;
+analog_modern_full_text_alert_color: #E8F5E9;
+analog_modern_full_fill_alert: #4E342E;
+analog_modern_full_text_alert: #E8F5E9;
+analog_modern_full_label_alert_color: #FFFFFF;
+analog_modern_full_border_alert_width: 1;
+analog_modern_full_border_alert_style: solid;
+analog_modern_full_border_alert_color: #FF6E40;
+
+bold_gauge_text_color: #FFFFFF;
+bold_gauge_background_alert: #3E2723;
+bold_gauge_border_alert: 4px solid #D32F2F;
+bold_gauge_fill_alert: #B71C1C;
+bold_gauge_text_alert: #FFFFFF;
+bold_gauge_scale_alert_color: #FFC107;
+bold_gauge_needle_alert_color: #000000;
+bold_gauge_center_dot_alert_color: #FFFFFF;
+bold_gauge_label_alert_color: #FFFFFF;
+bold_gauge_border_alert_width: 4;
+bold_gauge_border_alert_style: solid;
+bold_gauge_border_alert_color: #D32F2F;
+bold_gauge_background: #1B5E20;
+bold_gauge_border: 1px solid #F43F5E;
+bold_gauge_border_color: #388E3C;
+bold_gauge_border_style: solid;
+bold_gauge_border_width: 4;
+bold_gauge_center_dot_color: #81C784;
+bold_gauge_label_color: #FFFFFF;
+bold_gauge_needle_color: #81C784;
+bold_gauge_scale_color: #FFFFFF;
+bold_gauge_fill_color: #2E7D32;
+
+bright_gauge_background_color: #2E7D32;
+bright_gauge_border_color: #A5D6A7;
+bright_gauge_background: #2E7D32;
+bright_gauge_border_style: solid;
+bright_gauge_border_width: 1;
+bright_gauge_center_dot_color: #FFFFFF;
+bright_gauge_label_color: #FFFFFF;
+bright_gauge_needle_color: #FFFFFF;
+bright_gauge_scale_color: #FFFFFF;
+bright_gauge_text_color: #FFFFFF;
+bright_gauge_background_alert: #4E342E;
+bright_gauge_border_alert: 1px solid #F43F5E;
+bright_gauge_fill_alert: #66BB6A;
+bright_gauge_text_alert: #FFFFFF;
+bright_gauge_scale_alert_color: #FFFFFF;
+bright_gauge_needle_alert_color: #FFFFFF;
+bright_gauge_center_dot_alert_color: #FFFFFF;
+bright_gauge_label_alert_color: #FFFFFF;
+bright_gauge_border_alert_width: 1;
+bright_gauge_border_alert_style: solid;
+bright_gauge_border_alert_color: #A5D6A7;
+bright_gauge_fill_color: #66BB6A;
+bright_gauge_border: 1px solid #A5D6A7;
+
+clean_gauge_background: #1B2C27;
+clean_gauge_background_color: #1B2C27;
+clean_gauge_border_color: #1B2C27;
+clean_gauge_border_style: solid;
+clean_gauge_border_width: 1;
+clean_gauge_center_dot_color: #E8F5E9;
+clean_gauge_label_color: #E8F5E9;
+clean_gauge_needle_color: #E8F5E9;
+clean_gauge_scale_color: #E8F5E9;
+clean_gauge_text_color: #E8F5E9;
+clean_gauge_background_alert: #4E342E;
+clean_gauge_border_alert: 1px solid #F43F5E;
+clean_gauge_fill_alert: #F43F5E;
+clean_gauge_text_alert: #F59E0B;
+clean_gauge_scale_alert_color: #E8F5E9;
+clean_gauge_needle_alert_color: #E8F5E9;
+clean_gauge_center_dot_alert_color: #E8F5E9;
+clean_gauge_label_alert_color: #E8F5E9;
+clean_gauge_border_alert_width: 1;
+clean_gauge_border_alert_style: solid;
+clean_gauge_border_alert_color: #F43F5E;
+clean_gauge_fill_color: #1B2C27;
+clean_gauge_border: 1px solid #4A6C5B;
+
+custom_progressbar_background: #2A3F33;
+custom_progressbar_border: 1px solid #4A6C5B;
+custom_progressbar_fill_color: #4CAF50;
+custom_progressbar_text_color: #E8F5E9;
+custom_progressbar_scale_color: #81C784;
+custom_progressbar_needle_color: #F43F5E;
+custom_progressbar_center_dot_color: #A5D6A7;
+custom_progressbar_label_color: #E8F5E9;
+custom_progressbar_border_width: 1;
+custom_progressbar_border_style: solid;
+custom_progressbar_border_color: #4A6C5B;
+
+digital_gauge_font_color: #4CAF50;
+digital_gauge_bg_color: #1A2421;
+digital_gauge_border_color: 1px solid #334E44;
+digital_gauge_font_alert_color: #F43F5E;
+digital_gauge_bg_alert_color: #4E342E;
+digital_gauge_border_alert_color: 1px solid #F43F5E;
+digital_gauge_segment_color: #334E44;
+digital_gauge_background: #1A2421;
+digital_gauge_border: 1px solid #4A6C5B;
+digital_gauge_fill_color: #1B2C27;
+digital_gauge_text_color: #FFFFFF;
+digital_gauge_scale_color: #FFFFFF;
+digital_gauge_needle_color: #81C784;
+digital_gauge_center_dot_color: #81C784;
+digital_gauge_label_color: #FFFFFF;
+digital_gauge_border_width: 1;
+digital_gauge_border_style: solid;
+
+deep_shadow_gauge_color1: #1B2C27;
+deep_shadow_gauge_color2: #1B5E20;
+deep_shadow_gauge_color3: #388E3C;
+deep_shadow_gauge_border_color: #000000;
+deep_shadow_gauge_border_style: solid;
+deep_shadow_gauge_border_width: 1;
+deep_shadow_gauge_center_dot_color: #FFFFFF;
+deep_shadow_gauge_fill_color: #1B5E20;
+deep_shadow_gauge_label_color: #FFFFFF;
+deep_shadow_gauge_needle_color: #FFFFFF;
+deep_shadow_gauge_scale_color: #FFFFFF;
+deep_shadow_gauge_text_color: #FFFFFF;
+deep_shadow_gauge_background_alert: #1B5E20;
+deep_shadow_gauge_border_alert: 1px solid #F43F5E;
+deep_shadow_gauge_fill_alert: #1B5E20;
+deep_shadow_gauge_text_alert: #FFFFFF;
+deep_shadow_gauge_scale_alert_color: #FFFFFF;
+deep_shadow_gauge_needle_alert_color: #FFFFFF;
+deep_shadow_gauge_center_dot_alert_color: #FFFFFF;
+deep_shadow_gauge_label_alert_color: #FFFFFF;
+deep_shadow_gauge_border_alert_width: 1;
+deep_shadow_gauge_border_alert_style: solid;
+deep_shadow_gauge_border_alert_color: #000000;
+deep_shadow_gauge_background: #1B5E20;
+deep_shadow_gauge_border: 1px solid #F43F5E;
+
+fresh_gauge_border_color: #4A6C5B;
+fresh_gauge_border_style: solid;
+fresh_gauge_border_width: 1;
+fresh_gauge_label_color: #E8F5E9;
+fresh_gauge_background: #2A3F33;
+fresh_gauge_border: 1px solid #4A6C5B;
+fresh_gauge_text_color: #E8F5E9;
+fresh_gauge_scale_color: #81C784;
+fresh_gauge_needle_color: #4CAF50;
+fresh_gauge_center_dot_color: #E8F5E9;
+fresh_gauge_fill_color: #4CAF50;
+fresh_gauge_background_color: #2E7D32;
+
+flat_gauge_background: #1B5E20;
+flat_gauge_border_width: 1;
+flat_gauge_fill_color: #1B5E20;
+flat_gauge_background_alert: #4E342E;
+flat_gauge_border_alert: 1px solid #F43F5E;
+flat_gauge_fill_alert: #F43F5E;
+flat_gauge_text_alert: #F59E0B;
+flat_gauge_scale_alert_color: #FFFFFF;
+flat_gauge_needle_alert_color: #FFFFFF;
+flat_gauge_center_dot_alert_color: #FFFFFF;
+flat_gauge_label_alert_color: #FFFFFF;
+flat_gauge_border_alert_width: 1;
+flat_gauge_border_alert_style: solid;
+flat_gauge_border_alert_color: #F43F5E;
+flat_gauge_background_color: #1B5E20;
+flat_gauge_border: 1px solid #F43F5E;
+flat_gauge_border_color: transparent;
+flat_gauge_border_style: none;
+flat_gauge_center_dot_color: #FFFFFF;
+flat_gauge_label_color: #FFFFFF;
+flat_gauge_needle_color: #FFFFFF;
+flat_gauge_scale_color: #FFFFFF;
+flat_gauge_text_color: #FFFFFF;
+
+gauge_text_outline_color: #E8F5E9;
+gauge_high_contrast_text_color: #FFFFFF;
+gauge_warning_color: #F59E0B;
+gauge_critical_color: #F43F5E;
+gauge_background_normal: #2A3F33;
+gauge_border_normal: 1px solid #4A6C5B;
+gauge_fill_normal: #4A6C5B;
+gauge_text_normal: #E8F5E9;
+gauge_background_alert: #4E342E;
+gauge_border_alert: 1px solid #F43F5E;
+gauge_fill_alert: #F43F5E;
+gauge_text_alert: #F59E0B;
+
+gradient_fill_gauge_background: #1B2C27;
+gradient_fill_gauge_border: 1px solid #F43F5E;
+gradient_fill_gauge_border_color: #388E3C;
+gradient_fill_gauge_border_style: solid;
+gradient_fill_gauge_border_width: 1;
+gradient_fill_gauge_center_dot_color: #FFFFFF;
+gradient_fill_gauge_end_color: #2E7D32;
+gradient_fill_gauge_label_color: #FFFFFF;
+gradient_fill_gauge_needle_color: #FFFFFF;
+gradient_fill_gauge_scale_color: #FFFFFF;
+gradient_fill_gauge_start_color: #1B2C27;
+gradient_fill_gauge_text_color: #FFFFFF;
+
+heavy_gauge_background: #2A3F33;
+heavy_gauge_fill_color: #4A6C5B;
+heavy_gauge_scale_color: #81C784;
+heavy_gauge_text_color: #E8F5E9;
+heavy_gauge_label_color: #A5D6A7;
+heavy_gauge_needle_color: #F43F5E;
+heavy_gauge_center_dot_color: #A5D6A7;
+heavy_gauge_border_width: 4;
+heavy_gauge_border_style: solid;
+heavy_gauge_border_color: #4A6C5B;
+heavy_gauge_border: 4px solid #4A6C5B;
+heavy_border_gauge_border_color: #000000;
+heavy_border_gauge_border_width: 4;
+heavy_gauge_background_alert: #4E342E;
+heavy_gauge_border_alert: 2px solid #F43F5E;
+heavy_gauge_border_alert_color: #F43F5E;
+heavy_gauge_border_alert_style: solid;
+heavy_gauge_border_alert_width: 2;
+heavy_gauge_center_dot_alert_color: #F59E0B;
+heavy_gauge_fill_alert: #F43F5E;
+heavy_gauge_label_alert_color: #FFFFFF;
+heavy_gauge_needle_alert_color: #F59E0B;
+heavy_gauge_scale_alert_color: #E8F5E9;
+heavy_gauge_text_alert: #F59E0B;
+
+inset_gauge_background: #1B2C27;
+inset_gauge_border: 1px solid #F43F5E;
+inset_gauge_border_color: #388E3C;
+inset_gauge_border_style: inset;
+inset_gauge_border_width: 2;
+inset_gauge_center_dot_color: #FFFFFF;
+inset_gauge_fill_color: #1B5E20;
+inset_gauge_label_color: #FFFFFF;
+inset_gauge_needle_color: #FFFFFF;
+inset_gauge_scale_color: #FFFFFF;
+inset_gauge_text_color: #FFFFFF;
+inset_gauge_highlight_color: #388E3C;
+inset_gauge_shadow_color: #000000;
+
+linear_basic_background: #1B5E20;
+linear_basic_border: 1px solid #F43F5E;
+linear_basic_fill_color: #2E7D32;
+linear_basic_text_color: #FFFFFF;
+linear_basic_background_alert: #1B5E20;
+linear_basic_border_alert: 2px solid #FF6E40;
+linear_basic_fill_alert: #FF6E40;
+linear_basic_text_alert: #FFFFFF;
+linear_basic_scale_color: #FFFFFF;
+linear_basic_needle_color: #FFFFFF;
+linear_basic_center_dot_color: #FFFFFF;
+linear_basic_label_color: #FFFFFF;
+linear_basic_border_width: 1;
+linear_basic_border_style: solid;
+linear_basic_border_color: #388E3C;
+
+minimal_gauge_background: #1B2C27;
+minimal_gauge_border: 1px solid #F43F5E;
+minimal_gauge_border_color: #1B2C27;
+minimal_gauge_border_style: solid;
+minimal_gauge_border_width: 1;
+minimal_gauge_center_dot_color: #FFFFFF;
+minimal_gauge_fill_color: #1B2C27;
+minimal_gauge_label_color: #FFFFFF;
+minimal_gauge_needle_color: #FFFFFF;
+minimal_gauge_scale_color: #FFFFFF;
+minimal_gauge_text_color: #FFFFFF;
+
+outline_gauge_background: transparent;
+outline_gauge_border: 2px solid #4CAF50;
+outline_gauge_border_color: #4CAF50;
+outline_gauge_border_style: solid;
+outline_gauge_border_width: 2;
+outline_gauge_center_dot_color: #FFFFFF;
+outline_gauge_color: #FFFFFF;
+outline_gauge_fill_color: transparent;
+outline_gauge_label_color: #FFFFFF;
+outline_gauge_needle_color: #FFFFFF;
+outline_gauge_scale_color: #FFFFFF;
+outline_gauge_text_color: #FFFFFF;
+outline_gauge_background_alert: #3E2723;
+outline_gauge_border_alert: 4px solid #D32F2F;
+outline_gauge_fill_alert: #B71C1C;
+outline_gauge_text_alert: #FFFFFF;
+outline_gauge_needle_alert_color: #000000;
+outline_gauge_center_dot_alert_color: #FFFFFF;
+outline_gauge_label_alert_color: #FFFFFF;
+outline_gauge_border_alert_width: 2;
+outline_gauge_border_alert_style: solid;
+outline_gauge_border_alert_color: #D32F2F;
+outline_gauge_scale_alert_color: #FFC107;
+
+progressbar_background: #334E44;
+progressbar_border: 1px solid #4A6C5B;
+progressbar_border_radius: 8;
+progressbar_chunk_color: #4CAF50;
+progressbar_text_color: #E8F5E9;
+progressbar_background_alert: #4E342E;
+progressbar_border_alert: 1px solid #F43F5E;
+progressbar_chunk_alert_color: #F43F5E;
+progressbar_text_alert_color: #F59E0B;
+progressbar_border_width: 1;
+progressbar_border_color: #4A6C5B;
+progressbar_border_alert_color: #F43F5E;
+progressbar_border_style: solid;
+
+raised_gauge_shadow_color: #000000;
+raised_gauge_highlight_color: #388E3C;
+raised_gauge_background: #1B5E20;
+raised_gauge_border: 1px solid #F43F5E;
+raised_gauge_border_color: #388E3C;
+raised_gauge_border_style: outset;
+raised_gauge_border_width: 2;
+raised_gauge_center_dot_color: #FFFFFF;
+raised_gauge_fill_color: #1B5E20;
+raised_gauge_label_color: #FFFFFF;
+raised_gauge_needle_color: #FFFFFF;
+raised_gauge_scale_color: #FFFFFF;
+raised_gauge_text_color: #FFFFFF;
+raised_gauge_background_alert: #4E342E;
+raised_gauge_border_alert: 2px solid #F43F5E;
+raised_gauge_fill_alert: #F43F5E;
+raised_gauge_text_alert: #FFFFFF;
+raised_gauge_scale_alert_color: #FFFFFF;
+raised_gauge_needle_alert_color: #F59E0B;
+raised_gauge_center_dot_alert_color: #F59E0B;
+raised_gauge_label_alert_color: #FFFFFF;
+raised_gauge_border_alert_width: 2;
+raised_gauge_border_alert_style: solid;
+raised_gauge_border_alert_color: #F43F5E;
+
+semi_circle_modern_background: #1B2C27;
+semi_circle_modern_border: 1px solid #4A6C5B;
+semi_circle_modern_fill_color: #4A6C5B;
+semi_circle_modern_text_color: #E8F5E9;
+semi_circle_modern_background_alert: #4E342E;
+semi_circle_modern_border_alert: 2px solid #FF6E40;
+semi_circle_modern_fill_alert: #FF6E40;
+semi_circle_modern_text_alert: #FFFFFF;
+semi_circle_modern_scale_color: #FFFFFF;
+semi_circle_modern_needle_color: #FF6E40;
+semi_circle_modern_center_dot_color: #FF6E40;
+semi_circle_modern_label_color: #FFFFFF;
+semi_circle_modern_border_width: 1;
+semi_circle_modern_border_style: solid;
+semi_circle_modern_border_color: #4A6C5B;
+semi_circle_modern_border_alert_color: #FF6E40;
+semi_circle_modern_center_dot_alert_color: #FF6E40;
+semi_circle_modern_label_alert_color: #FFFFFF;
+semi_circle_modern_needle_alert_color: #FF6E40;
+semi_circle_modern_scale_alert_color: #FFFFFF;
+semi_circle_modern_border_alert_width: 2;
+semi_circle_modern_border_alert_style: solid;
+
+standard_modern_background: #1B2C27;
+standard_modern_border: 1px solid #4A6C5B;
+standard_modern_fill_color: #4A6C5B;
+standard_modern_text_color: #E8F5E9;
+standard_modern_background_alert: #4E342E;
+standard_modern_border_alert: 2px solid #F43F5E;
+standard_modern_fill_alert: #FF6E40;
+standard_modern_text_alert: #FFFFFF;
+standard_modern_center_dot_color: #E8F5E9;
+standard_modern_label_color: #A5D6A7;
+standard_modern_needle_color: #F43F5E;
+standard_modern_scale_color: #81C784;
+standard_modern_border_width: 1;
+standard_modern_border_style: solid;
+standard_modern_border_color: #4A6C5B;
+standard_modern_border_alert_style: solid;
+standard_modern_border_alert_color: #FF6E40;
+standard_modern_border_alert_width: 2;
+standard_modern_center_dot_alert_color: #FF6E40;
+standard_modern_label_alert_color: #FFFFFF;
+standard_modern_needle_alert_color: #FF6E40;
+standard_modern_scale_alert_color: #FFFFFF;
+
+shadowed_gauge_background: #1B5E20;
+shadowed_gauge_border: 1px solid #F43F5E;
+shadowed_gauge_border_color: #000000;
+shadowed_gauge_border_style: solid;
+shadowed_gauge_border_width: 1;
+shadowed_gauge_center_dot_color: #FFFFFF;
+shadowed_gauge_fill_color: #1B5E20;
+shadowed_gauge_label_color: #FFFFFF;
+shadowed_gauge_needle_color: #FFFFFF;
+shadowed_gauge_scale_color: #FFFFFF;
+shadowed_gauge_text_color: #FFFFFF;
+shadowed_gauge_shadow_color: rgba(0, 0, 0, 0.4);
+
+subtle_gauge_background: #2E7D32;
+subtle_gauge_background_color: #1A2421;
+subtle_gauge_border: 1px solid #F43F5E;
+subtle_gauge_border_color: #388E3C;
+subtle_gauge_border_style: solid;
+subtle_gauge_border_width: 1;
+subtle_gauge_center_dot_color: #E8F5E9;
+subtle_gauge_label_color: #E8F5E9;
+subtle_gauge_needle_color: #E8F5E9;
+subtle_gauge_scale_color: #E8F5E9;
+subtle_gauge_text_color: #E8F5E9;
+subtle_gauge_fill_color: #334E44;
+subtle_gauge_background_alert: #4E342E;
+subtle_gauge_border_alert: 1px solid #F43F5E;
+subtle_gauge_border_alert_color: #F43F5E;
+subtle_gauge_border_alert_style: solid;
+subtle_gauge_border_alert_width: 1;
+subtle_gauge_center_dot_alert_color: #F59E0B;
+subtle_gauge_fill_alert: #F43F5E;
+subtle_gauge_label_alert_color: #FFFFFF;
+subtle_gauge_needle_alert_color: #F59E0B;
+subtle_gauge_scale_alert_color: #E8F5E9;
+subtle_gauge_text_alert: #F59E0B;
+
+vintage_gauge_border: 1px solid #F43F5E;
+vintage_gauge_border_alert_color: #FF6E40;
+vintage_gauge_center_dot_color: #C8E6C9;
+vintage_gauge_label_color: #C8E6C9;
+vintage_gauge_needle_color: #C8E6C9;
+vintage_gauge_scale_color: #C8E6C9;
+vintage_gauge_text_alert: #C8E6C9;
+vintage_gauge_scale_alert_color: #FFC107;
+vintage_gauge_label_alert_color: #FFFFFF;
+vintage_gauge_border_alert: 2px solid #FF6E40;
+vintage_gauge_center_dot_alert_color: #FF0000;
+vintage_gauge_needle_alert_color: #000000;
+vintage_gauge_border_alert_width: 2;
+vintage_gauge_border_alert_style: solid;
+vintage_gauge_background_color: #2A4034;
+vintage_gauge_border_color: #FF6E40;
+vintage_gauge_border_width: 1;
+vintage_gauge_border_style: solid;
+vintage_gauge_background: #101D1A;
+vintage_gauge_fill_color: #2A3F33;
+vintage_gauge_text_color: #A5D6A7;
+vintage_gauge_background_alert: #1B5E20;
+vintage_gauge_fill_alert: #FF6E40;
+custom_progressbar_background_alert: #4E342E;
+custom_progressbar_border_alert: 1px solid #F43F5E;
+custom_progressbar_fill_alert_color: #F43F5E;
+custom_progressbar_text_alert_color: #FFFFFF;
+fresh_gauge_background_alert: #4E342E;
+fresh_gauge_border_alert: 1px solid #F43F5E;
+fresh_gauge_needle_alert_color: #F59E0B;
+fresh_gauge_center_dot_alert_color: #F43F5E;
+fresh_gauge_text_alert_color: #FFFFFF;
+gradient_fill_gauge_background_alert: #4E342E;
+gradient_fill_gauge_border_alert: 1px solid #F43F5E;
+gradient_fill_gauge_start_alert_color: #C2185B;
+gradient_fill_gauge_end_alert_color: #F43F5E;
+inset_gauge_background_alert: #4E342E;
+inset_gauge_border_alert: 1px solid #F43F5E;
+inset_gauge_shadow_alert_color: #000000;
+inset_gauge_highlight_alert_color: #E53935;
+minimal_gauge_background_alert: #4E342E;
+minimal_gauge_border_alert: 1px solid #F43F5E;
+shadowed_gauge_background_alert: #4E342E;
+shadowed_gauge_border_alert: 1px solid #F43F5E;
+shadowed_gauge_shadow_alert_color: rgba(244, 63, 94, 0.5);
+
+/* --- QSS Styling Rules --- */
+
+QMainWindow, QWidget#centralWidget {
+    background-color: @{main-window-bg};
+    color: @{label-color};
+}
+
+QLabel {
+    color: @{label-color};
+}
+
+QGroupBox {
+    background-color: @{groupbox-bg};
+    border: @{groupbox-border-width}px @{groupbox-border-style} @{groupbox-border-color};
+    border-radius: @{groupbox-border-radius}px;
+    margin-top: 2ex;
+    font-size: 9pt;
+    font-weight: bold;
+    color: @{groupbox-title-color};
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    padding: 0 3px;
+    background-color: @{groupbox-bg};
+}
+
+QTabWidget::pane {
+    background: @{tabwidget-pane-bg};
+    border: @{tabwidget-pane-border-width}px @{tabwidget-pane-border-style} @{tabwidget-pane-border-color};
+    border-radius: 8px;
+    margin-top: -1px;
+}
+
+QTabWidget::tab-bar {
+    left: 5px;
+}
+
+QTabBar::tab {
+    background: @{tab-bg-normal};
+    color: @{tab-color-normal};
+    border: 1px solid @{tabwidget-pane-border-color};
+    border-bottom: none;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    min-width: 8ex;
+    padding: 8px 15px;
+    margin-right: 2px;
+}
+
+QTabBar::tab:selected, QTabBar::tab:hover {
+    background: @{tab-bg-selected};
+    color: @{tab-color-selected};
+    font-weight: bold;
+}
+
+QTabBar::tab:selected {
+    border-color: @{tabwidget-pane-border-color};
+    border-bottom-color: @{tab-bg-selected};
+}
+
+QTabBar::tab:!selected {
+    margin-top: 2px;
+}
+
+QComboBox {
+    background-color: @{combobox-bg};
+    color: @{combobox-color};
+    border: @{combobox-border};
+    border-radius: 4px;
+    padding: 1px 18px 1px 3px;
+    min-width: 6em;
+}
+
+QComboBox:on {
+    padding-top: 3px;
+    padding-left: 4px;
+}
+
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 15px;
+    border-left-width: 1px;
+    border-left-color: @{combobox-border-color};
+    border-left-style: solid;
+    border-top-right-radius: 3px;
+    border-bottom-right-radius: 3px;
+}
+
+QComboBox QAbstractItemView {
+    background-color: @{combobox-bg};
+    selection-background-color: @{combobox-selection-bg};
+    color: @{combobox-color};
+}
+
+QPushButton {
+    background-color: @{button-bg-normal};
+    color: @{button-color-normal};
+    border-radius: @{button-border-radius}px;
+    padding: 5px 15px;
+    min-height: 24px;
+    font-weight: bold;
+}
+
+QPushButton:hover {
+    background-color: @{button-hover-bg};
+}
+
+QPushButton:pressed {
+    background-color: @{button-pressed-bg};
+}
+
+QLineEdit {
+    background-color: @{lineedit-bg};
+    color: @{lineedit-color};
+    border: @{lineedit-border};
+    border-radius: 4px;
+    padding: 3px;
+}
+
+QCheckBox {
+    color: @{label-color};
+}
+
+QStatusBar {
+    background-color: @{statusbar-bg};
+    color: @{statusbar-color};
+    border-top: 1px solid @{tabwidget-pane-border-color};
+    padding: 2px;
+}
+
+QProgressBar {
+    border: @{progressbar_border};
+    border-radius: @{progressbar_border_radius}px;
+    background-color: @{progressbar_background};
+    text-align: center;
+    color: @{progressbar_text_color};
+}
+
+QProgressBar::chunk:horizontal {
+    background-color: @{progressbar_chunk_color};
+    border-radius: @{progressbar_border_radius}px;
+}
+
+QProgressBar::chunk:vertical {
+    background-color: @{progressbar_chunk_color};
+    border-radius: @{progressbar_border_radius}px;
+}
+
+QProgressBar[alert_state="warning"] {
+    border-color: @{gauge_warning_color};
+}
+
+QProgressBar::chunk:horizontal[alert_state="warning"],
+QProgressBar::chunk:vertical[alert_state="warning"] {
+    background-color: @{gauge_warning_color};
+}
+
+QProgressBar[alert_state="critical"] {
+    border-color: @{progressbar_border_alert};
+    color: @{progressbar_text_alert_color};
+}
+
+QProgressBar::chunk:horizontal[alert_state="critical"],
+QProgressBar::chunk:vertical[alert_state="critical"] {
+    background-color: @{progressbar_chunk_alert_color};
+}
+
+QLabel#AboutAppNameLabel {
+    font-size: 20pt;
+    font-weight: bold;
+    color: @{groupbox-title-color};
+}
+
+QWidget#AboutTab {
+    background-color: @{main-window-bg};
+    border: none;
+}
+
+QWidget#AboutContentWidget {
+    background-color: @{main-window-bg};
+    border: none;
+}
+
+QScrollArea#AboutScrollArea {
+    background-color: @{main-window-bg};
+    border: none;
+}
+
+QScrollArea#AboutScrollArea::viewport {
+    background-color: @{main-window-bg};
+    border: none;
+}
+
+QLabel#AboutDescriptionLabel,
+QLabel#LicenseLabel {
+    color: @{label-color};
+}
+
+QGroupBox#SystemInfoGroup,
+QGroupBox#LinksGroup {
+    background-color: @{groupbox-bg};
+    border: @{groupbox-border-width}px @{groupbox-border-style} @{groupbox-border-color};
+    border-radius: @{groupbox-border-radius}px;
+    color: @{groupbox-title-color};
+    font-size: @{groupbox-font-size};
+    font-weight: @{groupbox-font-weight};
+}
+
+QGroupBox#SystemInfoGroup QLabel,
+QGroupBox#LinksGroup QLabel {
+    color: @{label-color};
+}
+
+QPushButton#AnaviWebsiteButton,
+QPushButton#GithubRepoButton {
+    background-color: @{button-bg-normal};
+    color: @{button-color-normal};
+    border-radius: @{button-border-radius}px;
+    padding: 5px 15px;
+    min-height: 24px;
+    font-weight: bold;
+}
+
+QPushButton#AnaviWebsiteButton:hover,
+QPushButton#GithubRepoButton:hover {
+    background-color: @{button-hover-bg};
+}
+
+QPushButton#AnaviWebsiteButton:pressed,
+QPushButton#GithubRepoButton:pressed {
+    background-color: @{button-pressed-bg};
+}
+
+QWidget#MatplotlibWidget {
+    background-color: @{matplotlib_container_bg};
+    border: @{matplotlib_border_normal};
+    border-radius: 8px;
+}
+
+QScrollArea#GaugesScrollArea {
+    background-color: transparent;
+    border: none;
+}
+
+QWidget#GaugesContainerWidget {
+    background-color: #1A1A1A;
+}
+
+QCheckBox::indicator {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+}
+
+QCheckBox::indicator:unchecked {
+    background-color: @{lineedit-bg};
+    border: 1px solid @{label-color};
+}
+
+QCheckBox::indicator:unchecked:hover {
+    border: 1px solid @{button-bg-normal};
+}
+
+QCheckBox::indicator:checked {
+    background-color: @{button-bg-normal};
+    border: 1px solid @{button-bg-normal};
+    image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><path fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke="%23ffffff" d="M2 8 L6 12 L14 4" /></svg>');
+}
+
+QCheckBox::indicator:disabled {
+    background-color: #444;
+    border: 1px solid #555;
+}
+
+QLCDNumber {
+    background-color: @{digital_gauge_bg_color};
+    color: @{digital_gauge_font_color};
+    border: none;
+}
+
+QListWidget {
+    background-color: @{groupbox-bg};
+    color: @{label-color};
+    border-radius: 4px;
+    border: 1px solid @{groupbox-border-color};
+}
+
+QListWidget::item:hover {
+    background-color: #333333;
+}
+
+QListWidget::item:selected {
+    background-color: @{button-bg-normal};
+    color: white;
+}
+
+QSpinBox, QDateTimeEdit {
+    background-color: @{lineedit-bg};
+    color: @{lineedit-color};
+    border: @{lineedit-border};
+    border-radius: 4px;
+    padding: 3px;
+}
+
+QSpinBox::up-button, QSpinBox::down-button {
+    subcontrol-origin: border;
+    width: 16px;
+    border-left-width: 1px;
+    border-left-style: solid;
+    border-left-color: @{groupbox-border-color};
+}
+
+QSpinBox::up-button {
+    subcontrol-position: top right;
+}
+
+QSpinBox::down-button {
+    subcontrol-position: bottom right;
+}
+
+QSpinBox::up-arrow, QSpinBox::down-arrow {
+    width: 10px;
+    height: 10px;
+}
+
+QSpinBox::up-arrow {
+    image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><path fill="%23E0E0E0" d="M8 5 L4 10 L12 10 Z" /></svg>');
+}
+QSpinBox::down-arrow {
+    image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><path fill="%23E0E0E0" d="M8 11 L4 6 L12 6 Z" /></svg>');
+}
+
+QDateTimeEdit::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 20px;
+    border-left: 1px solid @{groupbox-border-color};
+}
+
+QDateTimeEdit::down-arrow {
+    image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%23E0E0E0" viewBox="0 0 16 16"><path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z"/></svg>');
+}
+
+
+QCalendarWidget QWidget {
+   alternate-background-color: @{button-bg-normal};
+   color: @{label-color};
+}
+QCalendarWidget QToolButton {
+   color: @{label-color};
+   background-color: transparent;
+   border: none;
+   margin: 5px;
+}
+
+QCalendarWidget QMenu {
+   background-color: @{groupbox-bg};
+}
+
+QCalendarWidget QSpinBox {
+   background-color: @{lineedit-bg};
+   color: @{lineedit-color};
+   border: 1px solid @{groupbox-border-color};
+}
+
+QCalendarWidget QAbstractItemView:enabled {
+   background-color: @{groupbox-bg};
+   color: @{label-color};
+   selection-background-color: @{button-bg-normal};
+   selection-color: white;
+}
+
+QCalendarWidget QAbstractItemView:disabled {
+   color: #666;
+}
+
+QWidget[class="tab-page"] {
+   background-color: @{tabwidget-pane-bg};
+   border: none;
+}
+
+QScrollArea {
+   background-color: @{tabwidget-pane-bg};
+   border: none;
+}
+
+QScrollArea::viewport {
+   background-color: @{tabwidget-pane-bg};
+   border: none;
+}
+
+QScrollBar:vertical {
+    background: #282828;
+    width: 12px;
+    margin: 15px 0px 15px 0px;
+    border: 1px solid #383838;
+    border-radius: 6px;
+}
+
+QScrollBar::handle:vertical {
+    background: #616161;
+    min-height: 20px;
+    border-radius: 5px;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    background: none;
+    height: 15px;
+    subcontrol-origin: margin;
+}
+
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+    background: none;
+}
+
+QScrollBar::up-arrow:vertical, QScrollBar::down-arrow:vertical {
+    width: 10px;
+    height: 10px;
+    background: #BDBDBD;
+    border-radius: 5px;
+}
+
+QScrollBar::up-arrow:vertical {
+    image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><path fill="%23BDBDBD" d="M8 5 L4 10 L12 10 Z" transform="rotate(180 8 7.5)" /></svg>');
+}
+
+QScrollBar::down-arrow:vertical {
+    image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><path fill="%23BDBDBD" d="M8 11 L4 6 L12 6 Z" /></svg>');
+}

@@ -1,134 +1,182 @@
+# widgets/about_tab.py
 # -*- coding: utf-8 -*-
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSpacerItem, QSizePolicy
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPixmap, QImage, QColor # Import QColor for theme updates
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QScrollArea, QPushButton, QHBoxLayout, QGroupBox 
+from PyQt5.QtCore import Qt, QUrl, pyqtSlot, pyqtSignal
+from PyQt5.QtGui import QFont, QDesktopServices, QColor 
+
 import logging
+import platform
+import sys
 import os
-import sys # Import sys for sys._MEIPASS
+import matplotlib
 
 logger = logging.getLogger(__name__)
 
 class AboutTab(QWidget):
     """
-    About tab displaying information about the Anavi Sensor Dashboard application.
+    The About tab provides information about the application, its version,
+    license, and links to relevant resources.
     """
-    def __init__(self, main_window, theme_colors, parent=None):
+
+    ui_customization_changed = pyqtSignal(str, str) 
+    theme_changed = pyqtSignal(str) 
+
+    def __init__(self, theme_colors, main_window=None, parent=None): 
         super().__init__(parent)
-        self.setObjectName("AboutTab") # Object name for QSS
-        self.main_window = main_window # Store main_window reference
-        self.theme_colors = theme_colors # Store theme colors
+        self.setObjectName("AboutTab") # Object name for the tab itself
+
+        self.theme_colors = theme_colors # Store initial theme colors
+        self.main_window = main_window 
 
         self.setup_ui()
+        # Call update_theme_colors to apply initial theme colors and polish widgets
+        self.update_theme_colors(theme_colors) 
         logger.info("AboutTab initialized.")
 
     def setup_ui(self):
-        """Sets up the layout and widgets for the about tab."""
+        """Sets up the main layout and widgets for the About tab."""
+        # The main_layout is the layout for the AboutTab itself
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(50, 50, 50, 50) # Ample padding
-        main_layout.setAlignment(Qt.AlignCenter) # Center content in the tab
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(15)
+        main_layout.setAlignment(Qt.AlignTop)
 
-        # Application Name
-        app_name_label = QLabel("Anavi Sensor Dashboard")
-        app_name_label.setObjectName("AboutAppNameLabel")
-        app_name_label.setAlignment(Qt.AlignCenter)
-        main_layout.addWidget(app_name_label)
-
-        # Version
-        version_label = QLabel("Version 1.0.0")
-        version_label.setObjectName("AboutVersionLabel")
-        version_label.setAlignment(Qt.AlignCenter)
-        main_layout.addWidget(version_label)
-
-        # Spacer
-        main_layout.addItem(QSpacerItem(20, 30, QSizePolicy.Minimum, QSizePolicy.Fixed))
-
-        # Logo (if available)
-        # CORRECTED: Pass full path from resources to get_resource_path
-        logo_path = self.get_resource_path("images/logo.png") 
-        if os.path.exists(logo_path):
-            try:
-                # Load as QImage first to allow scaling and format conversion
-                logo_image = QImage(logo_path)
-                # Scale the image while maintaining aspect ratio, e.g., to a max width of 200px
-                scaled_logo = logo_image.scaledToWidth(200, Qt.SmoothTransformation)
-                logo_pixmap = QPixmap.fromImage(scaled_logo)
-
-                logo_label = QLabel()
-                logo_label.setPixmap(logo_pixmap)
-                logo_label.setAlignment(Qt.AlignCenter)
-                main_layout.addWidget(logo_label)
-                logger.debug(f"AboutTab: Loaded and scaled logo from {logo_path}.")
-            except Exception as e:
-                logger.error(f"AboutTab: Failed to load or scale logo from {logo_path}: {e}", exc_info=True)
-                # Fallback to text if logo fails
-                main_layout.addWidget(QLabel("Anavi Logo (Image Failed to Load)"))
-        else:
-            logger.warning(f"AboutTab: Logo file not found at {logo_path}.")
-            main_layout.addWidget(QLabel("Anavi Logo (Image Not Found)"))
+        # Even if not strictly for scrolling, QScrollArea is used as a container
+        # for content_widget. We need to ensure its background is also themed.
+        self.scroll_area = QScrollArea() 
+        self.scroll_area.setObjectName("AboutScrollArea") 
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded) # Will hide if content fits
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         
-        # Spacer
-        main_layout.addItem(QSpacerItem(20, 30, QSizePolicy.Minimum, QSizePolicy.Fixed))
+        # This content_widget holds all the labels and group boxes
+        self.content_widget = QWidget() 
+        self.content_widget.setObjectName("AboutContentWidget") 
+        
+        self.content_layout = QVBoxLayout(self.content_widget) 
+        self.content_layout.setAlignment(Qt.AlignTop | Qt.AlignHCenter) 
+        self.content_layout.setContentsMargins(0, 0, 0, 0) 
 
-        # Description
+        app_name_label = QLabel("Anavi Sensor Dashboard")
+        app_name_label.setObjectName("AboutAppNameLabel") 
+        app_name_label.setAlignment(Qt.AlignCenter)
+        self.content_layout.addWidget(app_name_label)
+
+        version_label = QLabel("Version: 1.0.0 (Beta)")
+        version_label.setObjectName("AboutVersionLabel") 
+        version_label.setAlignment(Qt.AlignCenter)
+        self.content_layout.addWidget(version_label)
+
+        self.content_layout.addSpacing(20)
+
         description_label = QLabel(
-            "The Anavi Sensor Dashboard is an open-source application designed "
-            "to monitor environmental data from various sensors. "
-            "It provides real-time value displays, customizable gauges, "
-            "and historical data plotting with alert notifications."
+            "The Anavi Sensor Dashboard is a PyQt5-based application designed "
+            "to monitor and visualize environmental sensor data. It supports "
+            "various Anavi pHAT sensors (HTU21D, BMP180, BH1750) and provides "
+            "real-time readings, historical plots, alert notifications, and "
+            "UI customization options."
         )
         description_label.setObjectName("AboutDescriptionLabel")
-        description_label.setAlignment(Qt.AlignCenter)
-        description_label.setWordWrap(True) # Enable word wrapping
-        main_layout.addWidget(description_label)
+        description_label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        description_label.setWordWrap(True)
+        self.content_layout.addWidget(description_label)
+        
+        self.content_layout.addSpacing(20)
 
-        # Spacer
-        main_layout.addItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Fixed))
+        system_info_group = QGroupBox("System Information") 
+        system_info_group.setObjectName("SystemInfoGroup")
+        system_info_layout = QVBoxLayout(system_info_group)
+        
+        try:
+            matplotlib_version_str = matplotlib.__version__
+        except ImportError:
+            matplotlib_version_str = "Not Installed"
+            logger.warning("Matplotlib is not installed. Version info not available.")
 
-        # Developer Info
-        developer_label = QLabel("Developed by: gr4ytips")
-        developer_label.setObjectName("AboutDeveloperLabel")
-        developer_label.setAlignment(Qt.AlignCenter)
-        main_layout.addWidget(developer_label)
+        system_info_layout.addWidget(QLabel(f"Operating System: {platform.system()} {platform.release()}"))
+        system_info_layout.addWidget(QLabel(f"Python Version: {sys.version.split(' ')[0]}"))
+        system_info_layout.addWidget(QLabel(f"PyQt5 Version: {__import__('PyQt5.QtCore').QtCore.PYQT_VERSION_STR}"))
+        system_info_layout.addWidget(QLabel(f"Matplotlib Version: {matplotlib_version_str}")) 
+        system_info_layout.addWidget(QLabel(f"Application Path: {os.path.dirname(os.path.abspath(sys.argv[0]))}"))
+
+        self.content_layout.addWidget(system_info_group)
+        self.content_layout.addSpacing(20)
+
+        license_label = QLabel(
+            "This software is provided under the MIT License.<br>"            
+        )
+        license_label.setObjectName("LicenseLabel")
+        license_label.setAlignment(Qt.AlignCenter)
+        self.content_layout.addWidget(license_label)
+
+        self.content_layout.addSpacing(20)
+
+        links_group = QGroupBox("Useful Links")
+        links_group.setObjectName("LinksGroup")
+        links_layout = QVBoxLayout(links_group)
+        
+        anavi_website_layout = QHBoxLayout()
+        anavi_website_layout.addWidget(QLabel("Graytips:"))
+        self.anavi_website_button = QPushButton("Visit Website")
+        self.anavi_website_button.setObjectName("AnaviWebsiteButton")
+
+        
+        anavi_website_layout.addWidget(self.anavi_website_button)
+        anavi_website_layout.addStretch(1)
+        links_layout.addLayout(anavi_website_layout)
 
         # GitHub Link (as a QLabel with openExternalLinks)
         github_link = QLabel(
             "<a href='https://github.com/gr4ytips/Anavi'>GitHub Repository</a>"
         )
-        github_link.setObjectName("AboutLink")
-        github_link.setAlignment(Qt.AlignCenter)
-        github_link.setOpenExternalLinks(True) # Allow opening links in default browser
-        main_layout.addWidget(github_link)
-        
-        main_layout.addStretch(1) # Push content to center/top
 
+        github_repo_layout = QHBoxLayout()
+        github_repo_layout.addWidget(QLabel("Source Code:"))
+        self.github_repo_button = QPushButton("GitHub Repo")
+        self.github_repo_button.setObjectName("GithubRepoButton")
+        github_repo_layout.addWidget(self.github_repo_button)
+        github_repo_layout.addStretch(1)
+        links_layout.addLayout(github_repo_layout)
 
-    def get_resource_path(self, relative_path):
-        """
-        Get the absolute path to a resource, handling both development and PyInstaller one-file builds.
-        :param relative_path: The path relative to the 'resources' directory (e.g., 'images/logo.png').
-        """
-        try:
-            # PyInstaller creates a temp folder and stores path in _MEIPASS
-            base_path = sys._MEIPASS
-        except Exception:
-            base_path = os.path.abspath(".")
-        
-        # CHANGED: Join directly with relative_path, assuming it now includes subdirs like 'fonts/' or 'images/'
-        resource_path = os.path.join(base_path, 'resources', relative_path)
-        logger.debug(f"AboutTab: Resolved resource path for '{relative_path}': {resource_path}")
-        return resource_path
+        self.content_layout.addWidget(links_group)
+        self.content_layout.addStretch(1) 
 
+        self.scroll_area.setWidget(self.content_widget) 
+        main_layout.addWidget(self.scroll_area)
+
+        logger.info("AboutTab: UI setup complete.")
+
+    @pyqtSlot(dict)
     def update_theme_colors(self, new_theme_colors):
         """
-        Updates the theme colors for this tab and its contained widgets.
+        Updates the internal theme color dictionary when the theme changes.
+        The visual update is handled by applying QSS and polishing widgets.
         """
-        logger.debug("AboutTab: Updating theme colors and re-polishing.")
-        self.theme_colors.clear() # Clear old colors
-        self.theme_colors.update(new_theme_colors) # Update with new colors
-
-        # Re-polish the tab itself and its children to apply QSS
-        self.style().polish(self)
-        for label in self.findChildren(QLabel):
-            label.style().polish(label)
+        logger.info(f"{self.objectName()}: update_theme_colors called.")
         
-        logger.debug("AboutTab: Tab re-polished to apply new theme QSS.")
+        self.theme_colors = dict(new_theme_colors) if new_theme_colors is not None else {}
+        
+        if not self.theme_colors:
+            logger.warning(f"{self.objectName()} received empty theme colors.")
+            return 
+
+        # Get the background color from the theme (e.g., 'window_bg' or 'groupbox_bg')
+        # Use 'window_bg' as it's typically the main background for tabs/windows.
+        background_color = self.theme_colors.get('window_bg', QColor('#2E2E2E')).name() 
+
+        # Apply stylesheet directly to the AboutTab itself, its content_widget, and the scroll_area's viewport
+        # This ensures their backgrounds are explicitly set.
+        # The AboutTab is the top-level widget for this tab.
+        self.setStyleSheet(f"QWidget#AboutTab {{ background-color: {background_color}; }}")
+        self.content_widget.setStyleSheet(f"QWidget#AboutContentWidget {{ background-color: {background_color}; }}")
+        self.scroll_area.setStyleSheet(f"QScrollArea#AboutScrollArea {{ background-color: {background_color}; }}")
+        self.scroll_area.viewport().setStyleSheet(f"QWidget {{ background-color: {background_color}; }}") # Ensure viewport is also themed
+        
+        # Polish the widgets to force QSS re-evaluation
+        self.style().polish(self) 
+        self.style().polish(self.content_widget) 
+        self.style().polish(self.scroll_area) 
+        self.style().polish(self.scroll_area.verticalScrollBar()) 
+        self.style().polish(self.scroll_area.horizontalScrollBar()) 
+        
+        logger.info(f"{self.objectName()}: Theme colors updated and widgets polished.")

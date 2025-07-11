@@ -50,6 +50,7 @@ Sensor_Logs/
 Debug_Logs/
 Archive_Sensor_Logs/
 split.sh
-backup
+backup/
 *.txt
 *.bak
+.ini
