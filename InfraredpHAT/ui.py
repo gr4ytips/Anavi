@@ -120,7 +120,7 @@ class AnaviSensorUI(QWidget):
         self.tab_widget.addTab(self.ui_customization_tab, "UI Customization")
 
         self.about_tab = AboutTab(
-            theme_colors=self.theme_colors,
+            settings_manager=self.settings_manager,
             main_window=self.main_window
         )
         self.tab_widget.addTab(self.about_tab, "About")

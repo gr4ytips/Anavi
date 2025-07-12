@@ -259,6 +259,10 @@ custom_progressbar_label_color: #CED4DA;
 custom_progressbar_border_width: 1;
 custom_progressbar_border_style: solid;
 custom_progressbar_border_color: #49505A;
+custom_progressbar_background_alert: #3E2723;
+custom_progressbar_border_alert: 1px solid #F43F5E;
+custom_progressbar_fill_alert_color: #F43F5E;
+custom_progressbar_text_alert_color: #FFFFFF;
 
 digital_gauge_font_color: #4A90E2;
 digital_gauge_bg_color: #1E212B;
@@ -316,6 +320,11 @@ fresh_gauge_needle_color: #4A90E2;
 fresh_gauge_center_dot_color: #CED4DA;
 fresh_gauge_fill_color: #4A90E2;
 fresh_gauge_background_color: #2F3B4F;
+fresh_gauge_background_alert: #3E2723;
+fresh_gauge_border_alert: 1px solid #F43F5E;
+fresh_gauge_needle_alert_color: #FF6F42;
+fresh_gauge_center_dot_alert_color: #F43F5E;
+fresh_gauge_text_alert_color: #FFFFFF;
 
 flat_gauge_background: #141A23;
 flat_gauge_border_width: 1;
@@ -366,6 +375,10 @@ gradient_fill_gauge_needle_color: #FFFFFF;
 gradient_fill_gauge_scale_color: #FFFFFF;
 gradient_fill_gauge_start_color: #22252E;
 gradient_fill_gauge_text_color: #FFFFFF;
+gradient_fill_gauge_background_alert: #3E2723;
+gradient_fill_gauge_border_alert: 1px solid #F43F5E;
+gradient_fill_gauge_start_alert_color: #C2185B;
+gradient_fill_gauge_end_alert_color: #F43F5E;
 
 heavy_gauge_background: #2B303B;
 heavy_gauge_fill_color: #49505A;
@@ -405,6 +418,19 @@ inset_gauge_scale_color: #FFFFFF;
 inset_gauge_text_color: #FFFFFF;
 inset_gauge_highlight_color: #556680;
 inset_gauge_shadow_color: #000000;
+inset_gauge_fill_alert: #3E2723;
+inset_gauge_text_alert: #FFFFFF;
+inset_gauge_scale_alert_color: #FFFFFF;
+inset_gauge_needle_alert_color: #FF6F42;
+inset_gauge_center_dot_alert_color: #FF6F42;
+inset_gauge_label_alert_color: #FFFFFF;
+inset_gauge_border_alert_width: 2;
+inset_gauge_border_alert_style: solid;
+inset_gauge_border_alert_color: #F43F5E;
+inset_gauge_background_alert: #3E2723;
+inset_gauge_border_alert: 1px solid #F43F5E;
+inset_gauge_shadow_alert_color: #000000;
+inset_gauge_highlight_alert_color: #E53935;
 
 linear_basic_background: #141A23;
 linear_basic_border: 1px solid #F43F5E;
@@ -433,6 +459,8 @@ minimal_gauge_label_color: #FFFFFF;
 minimal_gauge_needle_color: #FFFFFF;
 minimal_gauge_scale_color: #FFFFFF;
 minimal_gauge_text_color: #FFFFFF;
+minimal_gauge_background_alert: #3E2723;
+minimal_gauge_border_alert: 1px solid #F43F5E;
 
 outline_gauge_background: transparent;
 outline_gauge_border: 2px solid #4A90E2;
@@ -555,6 +583,9 @@ shadowed_gauge_needle_color: #FFFFFF;
 shadowed_gauge_scale_color: #FFFFFF;
 shadowed_gauge_text_color: #FFFFFF;
 shadowed_gauge_shadow_color: rgba(0, 0, 0, 0.4);
+shadowed_gauge_background_alert: #3E2723;
+shadowed_gauge_border_alert: 1px solid #F43F5E;
+shadowed_gauge_shadow_alert_color: rgba(244, 63, 94, 0.5);
 
 subtle_gauge_background: #2F3B4F;
 subtle_gauge_background_color: #1E212B;
@@ -603,29 +634,6 @@ vintage_gauge_fill_color: #2B303B;
 vintage_gauge_text_color: #8A96A8;
 vintage_gauge_background_alert: #141A23;
 vintage_gauge_fill_alert: #FF6F42;
-custom_progressbar_background_alert: #3E2723;
-custom_progressbar_border_alert: 1px solid #F43F5E;
-custom_progressbar_fill_alert_color: #F43F5E;
-custom_progressbar_text_alert_color: #FFFFFF;
-fresh_gauge_background_alert: #3E2723;
-fresh_gauge_border_alert: 1px solid #F43F5E;
-fresh_gauge_needle_alert_color: #FF6F42;
-fresh_gauge_center_dot_alert_color: #F43F5E;
-fresh_gauge_text_alert_color: #FFFFFF;
-gradient_fill_gauge_background_alert: #3E2723;
-gradient_fill_gauge_border_alert: 1px solid #F43F5E;
-gradient_fill_gauge_start_alert_color: #C2185B;
-gradient_fill_gauge_end_alert_color: #F43F5E;
-inset_gauge_background_alert: #3E2723;
-inset_gauge_border_alert: 1px solid #F43F5E;
-inset_gauge_shadow_alert_color: #000000;
-inset_gauge_highlight_alert_color: #E53935;
-minimal_gauge_background_alert: #3E2723;
-minimal_gauge_border_alert: 1px solid #F43F5E;
-shadowed_gauge_background_alert: #3E2723;
-shadowed_gauge_border_alert: 1px solid #F43F5E;
-shadowed_gauge_shadow_alert_color: rgba(244, 63, 94, 0.5);
-
 /* --- QSS Styling Rules --- */
 
 QMainWindow, QWidget#centralWidget {

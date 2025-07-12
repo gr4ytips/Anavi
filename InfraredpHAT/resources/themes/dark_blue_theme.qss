@@ -422,6 +422,15 @@ inset_gauge_background_alert: #49121c;
 inset_gauge_border_alert: 1px solid #F43F5E;
 inset_gauge_shadow_alert_color: #000000;
 inset_gauge_highlight_alert_color: #db3854;
+inset_gauge_fill_alert: #49121c;
+inset_gauge_text_alert: #FFFFFF;
+inset_gauge_scale_alert_color: #FFFFFF;
+inset_gauge_needle_alert_color: #FF4500;
+inset_gauge_center_dot_alert_color: #FF4500;
+inset_gauge_label_alert_color: #FFFFFF;
+inset_gauge_border_alert_width: 2;
+inset_gauge_border_alert_style: solid;
+inset_gauge_border_alert_color: #F43F5E;
 
 linear_basic_background: #000080;
 linear_basic_border: 1px solid #F43F5E;
