@@ -51,25 +51,47 @@ class MatplotlibWidget(QWidget):
         self.vertical_layout.setSpacing(0)
 
         # Set initial background to transparent to allow QSS styling
-        self.figure.patch.set_alpha(0.0) 
-        self.ax.patch.set_alpha(0.0)
+        #self.figure.patch.set_alpha(0.0) 
+        #self.ax.patch.set_alpha(0.0)
 
         self.apply_initial_theme() 
         
         # Polish self in init to apply QSS immediately to the widget's own background
         self.style().polish(self) 
         logger.info("MatplotlibWidget initialized.")
+
+    def _get_color_from_theme(self, key, default_color_hex_string):
+        """
+        Helper to safely get a color from theme_colors and ensure it's a hex string.
+        `default_color_hex_string` should always be like '#RRGGBB'.
+        """
+        color_val = self.theme_colors.get(key) # Get the value directly
+
+        if isinstance(color_val, QColor):
+            # If it's already a QColor object (from update_theme_colors conversion), convert it to hex
+            return color_val.name()
+        elif isinstance(color_val, str) and color_val.startswith('#'):
+            # If it's a hex string already, use it directly
+            return color_val
+        else:
+            # Fallback to the provided default or handle other unexpected types
+            # Log a warning if default_color_hex_string is not a hex string either
+            if not isinstance(default_color_hex_string, str) or not default_color_hex_string.startswith('#'):
+                logger.warning(f"MatplotlibWidget: Default color for key '{key}' is not a hex string: {default_color_hex_string}. Using black.")
+                return '#000000' # Safe fallback
+
+            return default_color_hex_string           
         
 
-    def _get_color_from_theme(self, key, default_color):
-        """Helper to safely get a QColor from theme_colors and convert to hex string."""
-        color_val = self.theme_colors.get(key, default_color)
-        if isinstance(color_val, QColor):
-            return color_val.name()
-        elif isinstance(color_val, str):
-            # If it's a string (e.g., '#RRGGBB'), ensure it's a valid QColor then return name
-            return QColor(color_val).name()
-        return QColor(default_color).name() # Fallback
+    #def _get_color_from_theme(self, key, default_color):
+    #    """Helper to safely get a QColor from theme_colors and convert to hex string."""
+    #    color_val = self.theme_colors.get(key, default_color)
+    #    if isinstance(color_val, QColor):
+    #        return color_val.name()
+    #    elif isinstance(color_val, str):
+    #        # If it's a string (e.g., '#RRGGBB'), ensure it's a valid QColor then return name
+    #        return QColor(color_val).name()
+    #   return QColor(default_color).name() # Fallback
 
     def _apply_matplotlib_theme_elements(self):
         """

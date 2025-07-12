@@ -42,29 +42,50 @@ class BaseGaugeDrawer:
     # --- MODIFIED: Updated method to create compact name with symbol ---
     def _draw_sensor_name(self, painter, rect, name, colors):
         """
-        Draws a shortened sensor name with a symbol inside the specified rect.
-        Uses the sensor's category and metric type to create a name like "BMP180 🌡️".
+        Draws a shortened sensor name with a theme-aware symbol inside the specified rect.
+        Draws the text and symbol in separate steps to allow for different colors.
         """
         painter.save()
         
-        # Create a compact name with a symbol
+        # --- Get required data ---
         sensor_category = self.parent_widget.sensor_category
         metric_type = self.parent_widget.metric_type.lower()
-        symbol = METRIC_SYMBOLS.get(metric_type, "")
-        display_name = f"{sensor_category} {symbol}".strip()
-
-        # Define font and color for the title
+        
+        theme_key = f"symbol_{metric_type}"
+        default_symbol = self._get_themed_string_property('symbol_default', '⚫')
+        symbol = self._get_themed_string_property(theme_key, default_symbol)
+        
+        # --- Setup font and metrics ---
         font_size = int(rect.width() / 14)
         if font_size < 8: font_size = 8
         
         font = QFont(self._get_themed_font_family('font_family', 'Inter'), font_size, QFont.Bold)
         painter.setFont(font)
-        painter.setPen(colors.get('label_color', QColor('black')))
+        metrics = QFontMetrics(font)
+
+        # --- NEW: Logic to draw text and symbol with different colors ---
+        text_part = f"{sensor_category} "  # Note the trailing space
+        symbol_part = symbol
+
+        # Calculate total width to center the entire block
+        total_width = metrics.horizontalAdvance(text_part + symbol_part)
+        text_part_width = metrics.horizontalAdvance(text_part)
         
-        text_options = Qt.AlignTop | Qt.AlignHCenter | Qt.TextWordWrap
-        
-        # Draw the new, compact name
-        painter.drawText(rect, text_options, display_name)
+        # Calculate starting position
+        current_x = rect.center().x() - (total_width / 2)
+        # Use a fixed vertical position for simplicity
+        text_y = rect.y() + metrics.ascent() + (rect.height() - metrics.height()) / 2
+
+        # 1. Draw the text part (e.g., "BMP180") using the label color
+        text_color = colors.get('label_color', QColor('black'))
+        painter.setPen(text_color)
+        painter.drawText(QPointF(current_x, text_y), text_part)
+
+        # 2. Draw the symbol part (e.g., "🌡️") using the new symbol color
+        # Falls back to the text color if 'symbol_color' is not in the theme
+        symbol_color = self._get_themed_color('symbol_color', text_color)
+        painter.setPen(symbol_color)
+        painter.drawText(QPointF(current_x + text_part_width, text_y), symbol_part)
         
         painter.restore()
 

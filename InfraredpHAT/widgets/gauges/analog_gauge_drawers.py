@@ -47,13 +47,17 @@ class AnalogGaugeDrawer(BaseGaugeDrawer):
         painter.save() 
         painter.translate(center_x, center_y)
         
-        if max_value - min_value != 0:
+        # --- Corrected Needle Calculation ---
+        if max_value > min_value:
             normalized_value = (current_value_animated - min_value) / (max_value - min_value)
         else:
             normalized_value = 0
             
+        # Clamp the value to the 0.0 to 1.0 range
         normalized_value = max(0.0, min(1.0, normalized_value)) 
-        angle = start_angle - (normalized_value * span_angle)
+        
+        # This formula correctly maps the normalized value to the gauge's angle span
+        angle = start_angle + (normalized_value * -span_angle)
         
         painter.rotate(angle)
         painter.setPen(Qt.NoPen)
@@ -78,7 +82,7 @@ class AnalogGaugeDrawer(BaseGaugeDrawer):
                                       QPointF(0, int(-needle_length_forward)))
             painter.drawRect(int(-needle_base_width/4), 0, int(needle_base_width/2), int(needle_length_backward))
 
-        painter.restore() 
+        painter.restore()
 
     def draw(self, painter, rect, sensor_name, current_value_animated, min_value, max_value, unit, gauge_style, colors):
         logger.debug(f"  Drawing Analog Gauge (Generic) for {self.parent_widget.objectName()}. Value: {current_value_animated}, Style: {gauge_style}")

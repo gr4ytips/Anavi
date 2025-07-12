@@ -26,6 +26,10 @@ from .gauges.digital_gauge_drawers import DigitalClassicGaugeDrawer, DigitalSegm
 from .gauges.compact_gauge_drawer import CompactGaugeDrawer
 from .gauges.custom_progress_bar_drawer import CustomProgressBarDrawer
 
+# Add these imports with your other gauge drawer imports
+from .gauges.needle_gauge_drawers import BasicNeedleGaugeDrawer, TickedGaugeDrawer
+from .gauges.arc_gauge_drawers import AnalogArcGaugeDrawer
+
 logger = logging.getLogger(__name__)
 
 class SensorDisplayWidget(QGroupBox):
@@ -41,7 +45,10 @@ class SensorDisplayWidget(QGroupBox):
         'Analog - Full', 
         'Analog - Full Classic', 
         'Analog - Modern Basic', 
-        'Analog - Modern Full', 
+        'Analog - Modern Full',
+        'Arc - Modern',                 # <-- ADD THIS
+        'Needle - Basic',               # <-- ADD THIS
+        'Needle - Ticked',              # <-- ADD THIS 
         'Compact', 
         'Digital - Classic', 
         'Digital - Segmented', 
@@ -87,6 +94,11 @@ class SensorDisplayWidget(QGroupBox):
         'Analog - Full Classic': AnalogClassicFullGaugeDrawer,
         'Analog - Modern Basic': AnalogModernBasicGaugeDrawer,
         'Analog - Modern Full': AnalogModernFullGaugeDrawer,
+         # --- ADD THESE THREE LINES ---
+        'Arc - Modern': AnalogArcGaugeDrawer,
+        'Needle - Basic': BasicNeedleGaugeDrawer,
+        'Needle - Ticked': TickedGaugeDrawer,
+        # -----------------------------
         'Compact': CompactGaugeDrawer,
         'Digital - Classic': DigitalClassicGaugeDrawer,
         'Digital - Segmented': DigitalSegmentedGaugeDrawer,
@@ -109,7 +121,9 @@ class SensorDisplayWidget(QGroupBox):
                  main_window=None,
                  is_preview=False):
         
-        super().__init__(sensor_name, parent=parent)
+        #super().__init__(sensor_name, parent=parent)
+        super().__init__("", parent=parent) # Pass an empty string to hide the default title
+        
         self.setMouseTracking(True)
         self.setObjectName(SettingsManager._format_name_for_qss(f"{sensor_category}_{metric_type}Display"))
         logger.debug(f"SensorDisplayWidget: Initializing {self.objectName()}. Title: {sensor_name}, Type: {gauge_type}")
@@ -244,13 +258,13 @@ class SensorDisplayWidget(QGroupBox):
             return default_value
         return str(value)
 
+# In file: sensor_display.py
+
     def _get_current_gauge_colors(self):
         """
         Determines the set of colors to use for drawing the gauge based on the
         current theme and the sensor's alert state.
         """
-        # --- MODIFIED: Color selection logic updated for specific alert states ---
-
         # 1. Define base colors for the 'normal' state
         base_bg = self._get_themed_color('gauge_background_normal', QColor('#F0F8FF'))
         base_border = self._get_themed_string_property('gauge_border_normal', '1px solid #87CEFA')
@@ -265,7 +279,7 @@ class SensorDisplayWidget(QGroupBox):
         if self._alert_state == 'critical':
             base_bg = self._get_themed_color('gauge_background_alert', QColor('#FFDCDC'))
             base_border = self._get_themed_string_property('gauge_border_alert', '1px solid #FF6666')
-            base_fill = self._get_themed_color('gauge_critical_color', QColor('#CC0000'))  # Use CRITICAL color
+            base_fill = self._get_themed_color('gauge_critical_color', QColor('#CC0000'))
             base_text = self._get_themed_color('gauge_text_alert', QColor('#FFFFFF'))
             base_scale = self._get_themed_color('analog_gauge_scale_alert_color', QColor('#CC0000'))
             base_needle = self._get_themed_color('analog_gauge_needle_alert_color', QColor('#FF4500'))
@@ -274,38 +288,40 @@ class SensorDisplayWidget(QGroupBox):
         elif self._alert_state == 'warning':
             base_bg = self._get_themed_color('gauge_background_alert', QColor('#FFF3CD'))
             base_border = self._get_themed_string_property('gauge_border_alert', '1px solid #FFC107')
-            base_fill = self._get_themed_color('gauge_warning_color', QColor('#FFD700'))  # Use WARNING color
-            base_text = self._get_themed_color('gauge_text_normal', QColor('#000000')) # Darker text for warning
+            base_fill = self._get_themed_color('gauge_warning_color', QColor('#FFD700'))
+            base_text = self._get_themed_color('gauge_text_normal', QColor('#000000'))
             base_scale = self._get_themed_color('analog_gauge_scale_alert_color', QColor('#FFC107'))
             base_needle = self._get_themed_color('analog_gauge_needle_alert_color', QColor('#FF4500'))
             base_center_dot = self._get_themed_color('analog_gauge_center_dot_alert_color', QColor('#FFC107'))
             base_label = self._get_themed_color('analog_gauge_text_alert_color', QColor('#000000'))
 
-        # --- END OF MODIFICATIONS ---
-
         # 3. Assemble the initial colors dictionary
         colors = {
-            'background': base_bg,
-            'border': base_border,
-            'fill_color': base_fill,
-            'text_color': base_text,
-            'scale_color': base_scale,
-            'needle_color': base_needle,
-            'center_dot_color': base_center_dot,
-            'label_color': base_label, 
+            'background': base_bg, 'border': base_border, 'fill_color': base_fill,
+            'text_color': base_text, 'scale_color': base_scale, 'needle_color': base_needle,
+            'center_dot_color': base_center_dot, 'label_color': base_label,
             'text_outline_color': self._get_themed_color('gauge_text_outline_color', QColor('black')),
-            'high_contrast_text_color': self._get_themed_color('gauge_high_contrast_text_color', QColor('white')),
+            'high_contrast_text_color': self._get_themed_color('high_contrast_text_color', QColor('white')),
             'warning_color': self._get_themed_color('gauge_warning_color', QColor('#FFD700')),
             'critical_color': self._get_themed_color('gauge_critical_color', QColor('#CC0000')),
             'gauge_border_width': self._get_themed_numeric_property('gauge_border_width', 1),
             'gauge_border_style': self._get_themed_string_property('gauge_border_style', 'solid'),
-            'gauge_border_color': self._get_themed_color('gauge_border_color', QColor('#87CEFA')), 
+            'gauge_border_color': self._get_themed_color('gauge_border_color', QColor('#87CEFA')),
         }
 
-        # 4. Apply gauge-specific overrides (This logic remains the same)
+        ### --- MODIFIED SECTION --- ###
+        # This corrected logic prioritizes the gauge TYPE over the STYLE.
+        
         prefix = ""
+        # First, check for a specific GAUGE TYPE prefix
         if self._gauge_type == "Analog - Basic Classic":
             prefix = "analog_basic_classic_"
+        elif self._gauge_type == "Arc - Modern":
+            prefix = "arc_modern_"
+        elif self._gauge_type == "Needle - Basic":
+            prefix = "needle_basic_"
+        elif self._gauge_type == "Needle - Ticked":
+            prefix = "needle_ticked_"
         elif self._gauge_type == "Analog - Full Classic":
             prefix = "analog_full_classic_"
         elif self._gauge_type == "Analog - Modern Basic":
@@ -318,39 +334,44 @@ class SensorDisplayWidget(QGroupBox):
             prefix = "standard_modern_"
         elif self._gauge_type == "Linear - Basic":
             prefix = "linear_basic_"
-        elif self._gauge_style == "Flat":
-            prefix = "flat_gauge_"
-        elif self._gauge_style == "Shadowed": 
-            prefix = "shadowed_gauge_"
-        elif self._gauge_style == "Raised":
-            prefix = "raised_gauge_"
-        elif self._gauge_style == "Inset":
-            prefix = "inset_gauge_"
-        elif self._gauge_style == "Heavy Border":
-            prefix = "heavy_gauge_"
-        elif self._gauge_style == "Clean":
-            prefix = "clean_gauge_"
-        elif self._gauge_style == "Deep Shadow":
-            prefix = "deep_shadow_gauge_"
-        elif self._gauge_style == "Outline":
-            prefix = "outline_gauge_"
-        elif self._gauge_style == "Vintage":
-            prefix = "vintage_gauge_"
-        elif self._gauge_style == "Subtle":
-            prefix = "subtle_gauge_"
-        elif self._gauge_style == "Fresh":
-            prefix = "fresh_gauge_"
-        elif self._gauge_style == "Bright":
-            prefix = "bright_gauge_"
-        elif self._gauge_style == "Bold":
-            prefix = "bold_gauge_"
         elif self._gauge_type == "Digital - Classic" or self._gauge_type == "Digital - Segmented":
             prefix = "digital_gauge_"
         elif self._gauge_type.startswith("Progress Bar - Custom"):
             prefix = "custom_progressbar_"
 
-
+        # ONLY if no type-specific prefix was found, check for a GAUGE STYLE prefix
+        if not prefix:
+            if self._gauge_style == "Flat":
+                prefix = "flat_gauge_"
+            elif self._gauge_style == "Shadowed":
+                prefix = "shadowed_gauge_"
+            elif self._gauge_style == "Raised":
+                prefix = "raised_gauge_"
+            elif self._gauge_style == "Inset":
+                prefix = "inset_gauge_"
+            elif self._gauge_style == "Heavy Border":
+                prefix = "heavy_gauge_"
+            elif self._gauge_style == "Clean":
+                prefix = "clean_gauge_"
+            elif self._gauge_style == "Deep Shadow":
+                prefix = "deep_shadow_gauge_"
+            elif self._gauge_style == "Outline":
+                prefix = "outline_gauge_"
+            elif self._gauge_style == "Vintage":
+                prefix = "vintage_gauge_"
+            elif self._gauge_style == "Subtle":
+                prefix = "subtle_gauge_"
+            elif self._gauge_style == "Fresh":
+                prefix = "fresh_gauge_"
+            elif self._gauge_style == "Bright":
+                prefix = "bright_gauge_"
+            elif self._gauge_style == "Bold":
+                prefix = "bold_gauge_"
+        ### --- END OF MODIFIED SECTION --- ###
+        
         if prefix:
+            # This part of the logic is correct and remains unchanged.
+            # It applies the normal theme colors first...
             colors['background'] = self._get_themed_color(f"{prefix}background", colors['background'])
             colors['border'] = self._get_themed_string_property(f"{prefix}border", colors['border'])
             colors['fill_color'] = self._get_themed_color(f"{prefix}fill_color", colors['fill_color'])
@@ -358,12 +379,12 @@ class SensorDisplayWidget(QGroupBox):
             colors['scale_color'] = self._get_themed_color(f"{prefix}scale_color", colors['scale_color'])
             colors['needle_color'] = self._get_themed_color(f"{prefix}needle_color", colors['needle_color'])
             colors['center_dot_color'] = self._get_themed_color(f"{prefix}center_dot_color", colors['center_dot_color'])
-            colors['label_color'] = self._get_themed_color(f"{prefix}label_color", colors['label_color']) 
-
+            colors['label_color'] = self._get_themed_color(f"{prefix}label_color", colors['label_color'])
             colors['gauge_border_width'] = self._get_themed_numeric_property(f"{prefix}border_width", colors['gauge_border_width'])
             colors['gauge_border_style'] = self._get_themed_string_property(f"{prefix}border_style", colors['gauge_border_style'])
             colors['gauge_border_color'] = self._get_themed_color(f"{prefix}border_color", colors['gauge_border_color'])
 
+            # ...and then applies the alert colors if needed.
             if self._alert_state != "normal":
                 colors['background'] = self._get_themed_color(f"{prefix}background_alert", colors['background'])
                 colors['border'] = self._get_themed_string_property(f"{prefix}border_alert", colors['border'])
@@ -372,14 +393,13 @@ class SensorDisplayWidget(QGroupBox):
                 colors['scale_color'] = self._get_themed_color(f"{prefix}scale_alert_color", colors['scale_color'])
                 colors['needle_color'] = self._get_themed_color(f"{prefix}needle_alert_color", colors['needle_color'])
                 colors['center_dot_color'] = self._get_themed_color(f"{prefix}center_dot_alert_color", colors['center_dot_color'])
-                colors['label_color'] = self._get_themed_color(f"{prefix}label_alert_color", colors['label_color']) 
-
+                colors['label_color'] = self._get_themed_color(f"{prefix}label_alert_color", colors['label_color'])
                 colors['gauge_border_width'] = self._get_themed_numeric_property(f"{prefix}border_alert_width", colors['gauge_border_width'])
                 colors['gauge_border_style'] = self._get_themed_string_property(f"{prefix}border_alert_style", colors['gauge_border_style'])
                 colors['gauge_border_color'] = self._get_themed_color(f"{prefix}border_alert_color", colors['gauge_border_color'])
 
         logger.debug(f"SensorDisplayWidget: Resolved colors for {self.objectName()} (Alert: {self._alert_state}): {dict(list(colors.items())[:5])}...")
-        return colors
+        return colors    
 
     def paintEvent(self, event):
         """Custom paint event for drawing the gauge."""
@@ -424,7 +444,9 @@ class SensorDisplayWidget(QGroupBox):
         
     def _trigger_alert(self, message):
         """Triggers an alert, playing sound if enabled and emitting signal."""
-        if self.settings_manager.get_boolean_setting('General', 'alert_sound_enabled', default=True):
+        #if self.settings_manager.get_boolean_setting('General', 'alert_sound_enabled', default=True):
+        sound_enabled_str = self.settings_manager.get_setting('General', 'alert_sound_enabled', "true")
+        if str(sound_enabled_str).lower() == 'true':
             if not self.alert_sound_timer.isActive():
                 self.alert_sound_timer.start()
                 logger.debug("SensorDisplayWidget: Alert sound timer started.")
@@ -446,97 +468,64 @@ class SensorDisplayWidget(QGroupBox):
     def update_value(self, raw_value):
         """
         Updates the sensor's current value, triggers alerts, and repaints the gauge.
+        This version is simplified to ensure correctness by removing animation.
         """
-        logger.debug(f"SensorDisplayWidget {self.sensor_category}_{self.metric_type}: update_value received raw: '{raw_value}' (type: {type(raw_value)}).")
+        logger.debug(f"SensorDisplayWidget {self.sensor_category}_{self.metric_type}: update_value received raw: '{raw_value}'.")
 
-        old_value = self._current_value
+        # --- 1. Parse and set the new value ---
         old_alert_state = self._alert_state
-        old_na_state = self._na_state
+        new_value = None
+        is_na = False
 
-        if raw_value is None or (isinstance(raw_value, (str)) and raw_value.strip().lower() == 'n/a'):
-            self._current_value = None
-            self._na_state = True
-            self._alert_state = "normal" 
-            logger.debug(f"SensorDisplayWidget: {self.sensor_name} is in N/A state.")
+        if raw_value is None or (isinstance(raw_value, str) and raw_value.strip().lower() == 'n/a'):
+            is_na = True
         else:
             try:
-                value_float = float(raw_value)
-                self._current_value = value_float
-                self._na_state = False
-                self._check_and_set_alert_state(value_float)
+                new_value = float(raw_value)
             except (ValueError, TypeError):
-                self._current_value = None
-                self._na_state = True
-                self._alert_state = "normal"
-                logger.warning(f"SensorDisplayWidget: Could not convert raw value '{raw_value}' to float for {self.sensor_name}. Setting to N/A.")
+                is_na = True
+                logger.warning(f"Could not convert '{raw_value}' to float for {self.sensor_name}.")
 
-        value_changed = (old_value != self._current_value) or (old_na_state != self._na_state)
-        alert_state_changed = (old_alert_state != self._alert_state)
+        self._current_value = new_value
+        self._na_state = is_na
 
-        if value_changed or alert_state_changed:
-            logger.debug(f"SensorDisplayWidget: {self.objectName()}: Value changed: {value_changed}, Alert state changed: {alert_state_changed}, NA state changed: {old_na_state != self._na_state}.")
-            
-            is_native_progressbar_type = (self._gauge_type == "Progress Bar - Horizontal" or
-                                          self._gauge_type == "Progress Bar - Vertical")
-            is_custom_progressbar_type = (self._gauge_type == "Progress Bar - Custom Horizontal" or
-                                          self._gauge_type == "Progress Bar - Custom Vertical")
+        # --- 2. Update the animated value directly (NO ANIMATION) ---
+        # This is the key fix: ensures the drawer always gets the correct value.
+        if self._na_state or self._current_value is None:
+            # If value is N/A, set animated value to the minimum to avoid errors
+            self._current_value_animated = self._min_value
+        else:
+            self._current_value_animated = self._current_value
 
+        # --- 3. Check and update alert state ---
+        if not self._na_state:
+            self._check_and_set_alert_state(self._current_value)
+        else:
+            self._alert_state = "normal"
 
-            if is_native_progressbar_type:
-                if not self._na_state:
-                    display_value = int(max(self._min_value, min(self._max_value, self._current_value)))
-                    self.progressBar.setValue(display_value)
-                    if self._alert_state == "warning":
-                        self.progressBar.setProperty("alert_state", "warning")
-                    elif self._alert_state == "critical":
-                        self.progressBar.setProperty("alert_state", "critical")
-                    else:
-                        self.progressBar.setProperty("alert_state", "normal")
-                    self.progressBar.setStyleSheet(self._get_progress_bar_qss())
-                    self.progressBar.style().polish(self.progressBar)
-                    logger.debug(f"SensorDisplayWidget: Progress bar value set to {display_value}.")
-                else:
-                    self.progressBar.setValue(0)
-                    self.progressBar.setProperty("alert_state", "normal")
-                    self.progressBar.setStyleSheet(self._get_progress_bar_qss())
-                    self.progressBar.style().polish(self.progressBar)
+        # --- 4. Handle native progress bar updates (if applicable) ---
+        is_native_progressbar_type = "Progress Bar -" in self._gauge_type and "Custom" not in self._gauge_type
+        if is_native_progressbar_type:
+            if not self._na_state:
+                display_value = int(max(self._min_value, min(self._max_value, self._current_value)))
+                self.progressBar.setValue(display_value)
+                self.progressBar.setProperty("alert_state", self._alert_state)
+            else:
+                self.progressBar.setValue(0)
+                self.progressBar.setProperty("alert_state", "normal")
+            self.progressBar.setStyleSheet(self._get_progress_bar_qss())
+            self.progressBar.style().polish(self.progressBar)
 
-            else: 
-                if self.value_label.isVisible(): 
-                    if self._na_state:
-                        self.value_label.setText("N/A")
-                    else:
-                        self.value_label.setText(f"{self._format_value(self._current_value)} {self.unit}")
-                    if self._alert_state == "normal":
-                        self.value_label.setStyleSheet(f"color: {self._get_themed_color('label_color', QColor('#34495E')).name()};")
-                    else:
-                        self.value_label.setStyleSheet(f"color: {self._get_themed_color('gauge_text_alert', QColor('red')).name()};")
-                
-                if self.animation.state() == QPropertyAnimation.Running:
-                    self.animation.stop()
-                
-                if value_changed and not self._na_state:
-                    self.animation.setStartValue(old_value if old_value is not None else self._min_value)
-                    self.animation.setEndValue(self._current_value)
-                    self.animation.start()
-                else:
-                    self._current_value_animated = self._min_value if self._current_value is None else self._current_value
-                    self.update() 
+        # --- 5. Emit alert signals if state changed ---
+        if old_alert_state != self._alert_state:
+            if self._alert_state != "normal":
+                alert_message = self._get_alert_message()
+                self._trigger_alert(alert_message)
+            else:
+                self._clear_alert()
 
-
-            if alert_state_changed:
-                if self._alert_state != "normal":
-                    alert_message = self._get_alert_message()
-                    self.alert_triggered.emit(self.sensor_category, self.metric_type, self._alert_state, alert_message)
-                    if self.settings_manager.get_boolean_setting('General', 'alert_sound_enabled', fallback=True):
-                        self._play_alert_sound()
-                else:
-                    self.alert_cleared.emit(self.sensor_category, self.metric_type)
-                    self.alert_sound_player.stop()
-
-            logger.debug(f"SensorDisplayWidget: Repaint requested for {self.objectName()}.")
-            self.update() 
-
+        # --- 6. Request a repaint for all custom-drawn gauges ---
+        self.update()    
     
     #def _check_and_set_alert_state(self, value):
     #    """Evaluates the alert state based on current value and thresholds."""

@@ -119,7 +119,8 @@ class DashboardTab(QWidget):
             self.settings_manager,
             hide_toolbar=self.hide_matplotlib_toolbar
         )
-        self.plot_widget.setObjectName("DashboardPlotWidget")
+        #self.plot_widget.setObjectName("DashboardPlotWidget")
+        self.plot_widget.setObjectName("MatplotlibWidget")
         plot_layout.addWidget(self.plot_widget)
 
         main_layout.addWidget(plot_group_box)
