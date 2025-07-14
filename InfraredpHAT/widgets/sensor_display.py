@@ -26,9 +26,14 @@ from .gauges.digital_gauge_drawers import DigitalClassicGaugeDrawer, DigitalSegm
 from .gauges.compact_gauge_drawer import CompactGaugeDrawer
 from .gauges.custom_progress_bar_drawer import CustomProgressBarDrawer
 
-# Add these imports with your other gauge drawer imports
 from .gauges.needle_gauge_drawers import BasicNeedleGaugeDrawer, TickedGaugeDrawer
 from .gauges.arc_gauge_drawers import AnalogArcGaugeDrawer
+from .gauges.speedometer_gauge_drawer import SpeedometerGaugeDrawer
+from .gauges.combined_arc_needle_gauge_drawer import CombinedArcNeedleGaugeDrawer
+from .gauges.speedometer_ticked_gauge_drawer import SpeedometerTickedGaugeDrawer
+from .gauges.ring_gauge_drawer import RingGaugeDrawer
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -39,30 +44,34 @@ class SensorDisplayWidget(QGroupBox):
     and style, including threshold-based color changes and alerts.
     """
     GAUGE_TYPES = [
-        'Analog', 
-        'Analog - Basic', 
-        'Analog - Basic Classic', 
-        'Analog - Full', 
-        'Analog - Full Classic', 
-        'Analog - Modern Basic', 
+        'Analog',
+        'Analog - Basic',
+        'Analog - Basic Classic',
+        'Analog - Full',
+        'Analog - Full Classic',
+        'Analog - Modern Basic',
         'Analog - Modern Full',
-        'Arc - Modern',                 # <-- ADD THIS
-        'Needle - Basic',               # <-- ADD THIS
-        'Needle - Ticked',              # <-- ADD THIS 
-        'Compact', 
-        'Digital - Classic', 
-        'Digital - Segmented', 
-        'Linear', 
-        'Linear - Basic', 
-        'Progress Bar - Horizontal', 
-        'Progress Bar - Vertical', 
+        'Arc - Modern',
+        'Combined Arc & Needle',
+        'Compact',
+        'Digital - Classic',
+        'Digital - Segmented',
+        'Linear',
+        'Linear - Basic',
+        'Needle - Basic',
+        'Needle - Ticked',
         'Progress Bar - Custom Horizontal',
-        'Progress Bar - Custom Vertical',  
-        'Semi-Circle', 
-        'Semi-Circle - Modern', 
-        'Standard', 
-        'Standard - Modern'
-        ]
+        'Progress Bar - Custom Vertical',
+        'Progress Bar - Horizontal',
+        'Progress Bar - Vertical',
+        'Semi-Circle',
+        'Semi-Circle - Modern',
+        'Speedometer',
+        'Speedometer - Ticked',
+        'Standard',
+        'Standard - Modern',
+        'Ring'
+    ]    
     GAUGE_STYLES = [
         'Bold',
         'Bright',
@@ -79,13 +88,13 @@ class SensorDisplayWidget(QGroupBox):
         'Raised',
         'Subtle',
         'Vintage'
-        ]
+    ]
 
     alert_triggered = pyqtSignal(str, str, str, str)
     alert_cleared = pyqtSignal(str, str)
     alert_state_changed = pyqtSignal(str, str, str) 
 
-    # Mapping gauge types to their drawing classes
+     # Mapping gauge types to their drawing classes
     GAUGE_DRAWERS = {
         'Analog': AnalogGaugeDrawer,
         'Analog - Basic': AnalogBasicGaugeDrawer,
@@ -94,22 +103,26 @@ class SensorDisplayWidget(QGroupBox):
         'Analog - Full Classic': AnalogClassicFullGaugeDrawer,
         'Analog - Modern Basic': AnalogModernBasicGaugeDrawer,
         'Analog - Modern Full': AnalogModernFullGaugeDrawer,
-         # --- ADD THESE THREE LINES ---
         'Arc - Modern': AnalogArcGaugeDrawer,
-        'Needle - Basic': BasicNeedleGaugeDrawer,
-        'Needle - Ticked': TickedGaugeDrawer,
-        # -----------------------------
+        'Combined Arc & Needle': CombinedArcNeedleGaugeDrawer,
         'Compact': CompactGaugeDrawer,
         'Digital - Classic': DigitalClassicGaugeDrawer,
         'Digital - Segmented': DigitalSegmentedGaugeDrawer,
         'Linear': LinearGaugeDrawer,
         'Linear - Basic': LinearGaugeDrawer, 
-        'Semi-Circle': SemiCircleGaugeDrawer,
-        'Semi-Circle - Modern': SemiCircleGaugeDrawer, 
-        'Standard': StandardGaugeDrawer,
-        'Standard - Modern': StandardGaugeDrawer, 
+        'Needle - Basic': BasicNeedleGaugeDrawer,
+        'Needle - Ticked': TickedGaugeDrawer,
         'Progress Bar - Custom Horizontal': CustomProgressBarDrawer,
         'Progress Bar - Custom Vertical': CustomProgressBarDrawer,     
+        'Semi-Circle': SemiCircleGaugeDrawer,
+        'Semi-Circle - Modern': SemiCircleGaugeDrawer, 
+        'Speedometer': SpeedometerGaugeDrawer,
+        'Speedometer - Ticked': SpeedometerTickedGaugeDrawer,
+        'Standard': StandardGaugeDrawer,
+        'Standard - Modern': StandardGaugeDrawer, 
+        # --- SNIPPET START ---
+        'Ring': RingGaugeDrawer # <--- ADD THIS LINE
+        # --- SNIPPET END ---
     }
 
     def __init__(self, sensor_name, sensor_category, metric_type,
@@ -314,7 +327,13 @@ class SensorDisplayWidget(QGroupBox):
         
         prefix = ""
         # First, check for a specific GAUGE TYPE prefix
-        if self._gauge_type == "Analog - Basic Classic":
+        if self._gauge_type == "Combined Arc & Needle":
+            prefix = "combined_arc_needle_"
+        elif self._gauge_type == "Speedometer":
+            prefix = "speedometer_"
+        elif self._gauge_type == "Speedometer - Ticked":
+            prefix = "speedometer_ticked_"            
+        elif self._gauge_type == "Analog - Basic Classic":
             prefix = "analog_basic_classic_"
         elif self._gauge_type == "Arc - Modern":
             prefix = "arc_modern_"
@@ -328,6 +347,8 @@ class SensorDisplayWidget(QGroupBox):
             prefix = "analog_modern_basic_"
         elif self._gauge_type == "Analog - Modern Full":
             prefix = "analog_modern_full_"
+        elif self._gauge_type == "Ring": # <--- ADD THIS LINE
+            prefix = "ring_"            
         elif self._gauge_type == "Semi-Circle - Modern":
             prefix = "semi_circle_modern_"
         elif self._gauge_type == "Standard - Modern":
@@ -416,15 +437,31 @@ class SensorDisplayWidget(QGroupBox):
         painter.setRenderHint(QPainter.SmoothPixmapTransform)
 
         rect = self.contentsRect()
-        logger.debug(f"SensorDisplayWidget: paintEvent triggered for {self.objectName()}. Current _value: {self._current_value}, Type: {self._gauge_type}, Style: {self._gauge_style}")
+        logger.debug(f"SensorDisplayWidget: paintEvent triggered for {self.objectName()}. Current _value: {self._current_value}, Type: {self._gauge_type}, Style: {self._gauge_style}. Rect: {rect.x()},{rect.y()},{rect.width()},{rect.height()}")
+
+        # --- DEBUG STEP: Draw a simple red rectangle directly in paintEvent ---
+        # This will test if the QPainter is fundamentally able to draw anything in this context.
+        #painter.setBrush(QBrush(QColor('red'))) # Use a very clear, high-contrast color
+        #painter.setPen(Qt.NoPen)
+        # Draw a small rectangle in the top-left corner of the widget's content area
+        #painter.drawRect(rect.x() + 10, rect.y() + 10, 50, 50)
+        #logger.debug(f"SensorDisplayWidget: Drawn a simple red rectangle at {rect.x()+10},{rect.y()+10} (STEP 0.1).")
+        # --- END DEBUG STEP ---
+
 
         colors = self._get_current_gauge_colors()
         
+        logger.debug(f"SensorDisplayWidget: paintEvent for {self.objectName()} - Colors prepared for drawer: "
+                     f"alert_state={self._alert_state}, "
+                     f"text_color={colors['text_color'].name()}, "
+                     f"fill_color={colors['fill_color'].name()}, "
+                     f"gauge_warning_color={colors['warning_color'].name()}, "
+                     f"gauge_critical_color={colors['critical_color'].name()}")
+
         if self.gauge_drawer:
             try:
-                #self.gauge_drawer.draw(painter, rect, self._current_value_animated, 
-                #                       self._min_value, self._max_value, self.unit, 
-                #                       self._gauge_style, colors)
+                # The gauge_drawer.draw call will now attempt to draw *after* the red rectangle.
+                # If the red rectangle shows, but the gauge doesn't, the issue is within the drawer's transforms.
                 self.gauge_drawer.draw(painter, rect, self.sensor_name, self._current_value_animated, 
                                        self._min_value, self._max_value, self.unit, 
                                        self._gauge_style, colors)
@@ -438,10 +475,14 @@ class SensorDisplayWidget(QGroupBox):
             self.value_label.setText(f"{self._format_value(self._current_value)} {self.unit}")
             self.value_label.setVisible(True)
             self.progressBar.setVisible(False)
-
-        #painter.restore()       
-
         
+        # Ensure painter state is restored. If you use painter.save() inside draw, painter.restore()
+        # should be called at the end of the paintEvent to balance it.
+        # Given your previous comment "#painter.restore()", it implies you might not be calling painter.save()
+        # inside the draw method, which is generally fine if painter.save()/restore() is used here.
+        # For safety, let's explicitly add painter.restore() if painter.save() is used at the top.
+        #painter.restore()
+
     def _trigger_alert(self, message):
         """Triggers an alert, playing sound if enabled and emitting signal."""
         #if self.settings_manager.get_boolean_setting('General', 'alert_sound_enabled', default=True):

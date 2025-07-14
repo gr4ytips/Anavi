@@ -52,5 +52,6 @@ Archive_Sensor_Logs/
 split.sh
 backup/
 *.txt
-*.bak
-logs
+*.py.bak
+logs/
+utils/
