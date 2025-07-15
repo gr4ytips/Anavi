@@ -53,5 +53,5 @@ split.sh
 backup/
 *.txt
 *.py.bak
-logs/
 utils/
+logs/
