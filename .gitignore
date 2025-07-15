@@ -53,3 +53,5 @@ split.sh
 backup
 *.txt
 *.bak
+utils/
+logs/
